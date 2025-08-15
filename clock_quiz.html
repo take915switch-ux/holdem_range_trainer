@@ -498,13 +498,13 @@ function renderChoices(options){
       state.score += bonus;
       state.streak += 1;
       showToast(`せいかい！ +${bonus}点（れんぞく +${state.streak*POINT_STREAK}）`);
-      speak("せいかいだよ、たけだめいちゃん！");
+      speak("せいかいだよ、ハートがすきな、たけだめいちゃん！");
     }else{
       state.score = clamp(0, state.score - PENALTY_WRONG, 99999);
       state.streak = 0;
       state.miss += 1;
       showToast(`ちがうよ… -${PENALTY_WRONG}点`);
-      speak("ちがうよ、たけだめいちゃん");
+      speak("ちがうよ、むらさきがすきな、たけだめいちゃん");
     }
     endQuestion(ok);
 		  // ★正解時のみ、自動で次の問題へ（重複遷移を防ぐため一時的にNextを無効化）
