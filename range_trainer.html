@@ -3,11 +3,14 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>レンジ記憶トレ（6-max｜UTG & HJ｜境界近傍優先・重複なし v4.3.1｜WebAudio・ボーナス内訳・自動進行オフ）</title>
+<title>solver plusレンジ記憶トレーニング（6-max・2.5bbオープン）</title>
 <style>
   :root {
     --table-green: #116b3b; --felt: #0c7a43; --seat:#444; --seat-text:#fff; --active:#e53935;
+    --selected:#42a5f5;
     --bg:#111; --card-bg:#fff; --card-outline:#ddd; --panel-bg:#1b1b1b; --panel-bd:#2d2d2d;
+    --grid-bg:#141414; --cell-bd:#2a2a2a; --fill:#e53935; --label:#e9e9e9;
+    --danger:#c62828;
   }
   html,body{margin:0;padding:0;background:var(--bg);color:#eee;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Hiragino Kaku Gothic ProN","Yu Gothic UI","Yu Gothic","Noto Sans JP","Meiryo",sans-serif}
   body{min-height:100vh;display:flex;flex-direction:column}
@@ -36,18 +39,22 @@
   }
   .coin::after{content:""; position:absolute; left:3px; top:3px; width:7px; height:3px; border-radius:50%;
     background: rgba(255,255,255,.55); filter: blur(0.2px);}
-  .bb-coin1{ top:25%; left:20%; }
-  .bb-coin2{ top:28%; left:24%; transform: rotate(12deg); }
+  .bb-coin1{ top:25%; left:20%; } .bb-coin2{ top:28%; left:24%; transform: rotate(12deg); }
   .sb-coin1{ bottom:25%; left:20%; transform: rotate(-3deg); }
   .seat{position:absolute; width:54px;height:24px;background:var(--seat);color:var(--seat-text);
-        border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:11px;opacity:.95; z-index:2}
+        border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:11px;opacity:.95; z-index:2; cursor:pointer; user-select:none}
   .seat.active{background:var(--active);font-weight:700}
+  .seat.pick{background:var(--selected);box-shadow:0 0 0 2px rgba(66,165,245,.3) inset}
+  .seat.focus{background:var(--selected);box-shadow:0 0 0 2px rgba(66,165,245,.4) inset; font-weight:700}
   .s1{top:2%;left:50%;transform:translateX(-50%)} /* UTG */
   .s2{top:19%;right:6%} .s3{bottom:19%;right:6%} .s4{bottom:2%;left:50%;transform:translateX(-50%)} /* BTN */
   .s5{bottom:19%;left:6%} .s6{top:19%;left:6%}
+  /* Panels */
   .panel{background:var(--panel-bg);border:1px solid var(--panel-bd);border-radius:12px;padding:10px;display:flex;flex-direction:column;gap:8px}
-  .q{font-size:16px;text-align:center;margin:0}
+  .panel-head{display:flex; justify-content:space-between; align-items:center; gap:8px; flex-wrap:wrap}
+  .q{font-size:16px;text-align:center;margin:0; flex:1}
   .cards{display:flex;justify-content:center;gap:8px;flex-wrap:wrap}
+  /* Card */
   .card{width:78px;height:112px;background:var(--card-bg);border-radius:10px;border:1px solid var(--card-outline);
         position:relative;box-shadow:0 4px 12px rgba(0,0,0,.35)}
   .rank{position:absolute;left:6px;top:4px;font-weight:700;font-size:20px}
@@ -56,16 +63,19 @@
   .suit.bottom{left:auto;right:6px;bottom:24px;top:auto;transform:rotate(180deg)}
   .pip{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);font-size:40px}
   .black{color:#111} .red{color:#c62828}
+  /* Controls */
   .controls{display:flex;justify-content:center;gap:8px;flex-wrap:wrap}
   .choices{display:grid;grid-template-columns:repeat(5,1fr);gap:6px}
   button{padding:8px 10px;border-radius:10px;border:1px solid #3a3a3a;background:#222;color:#eee;font-size:14px}
   .choices button{padding:10px 0}
   button:active{transform:translateY(1px)}
+  .btn-danger{background:#2a1a1a;border-color:#5a2a2a;color:#ffb4b4}
+  .btn-danger:active{transform:translateY(1px)}
   .result{text-align:center;min-height:22px;margin-top:2px}
   .score{text-align:center;font-size:13px;opacity:.9}
   .sticky-next{position:sticky;bottom:0;display:flex;justify-content:center;background:linear-gradient(180deg, rgba(27,27,27,0), rgba(27,27,27,1));padding-top:6px;margin-top:0}
   #nextBtn{width:100%;max-width:240px}
-  .hidden{display:none}
+  .hidden{display:none !important}
   table{width:100%;border-collapse:collapse}
   th,td{border:1px solid #333;padding:6px 4px;text-align:center;font-size:13px}
   th{background:#232323}
@@ -82,10 +92,27 @@
     #nextBtn{max-width:220px}
   }
   .sound-tip{font-size:12px; opacity:.85; text-align:center;}
+  .start-controls{display:flex; flex-direction:column; gap:8px; align-items:center}
+  .pos-help{font-size:12px; opacity:.85; text-align:center}
+
+  /* Range Viewer */
+  .viewer{background:var(--panel-bg); border:1px solid var(--panel-bd); border-radius:12px; padding:10px; display:flex; flex-direction:column; gap:8px}
+  .viewer-header{display:flex; justify-content:space-between; align-items:center; gap:8px; flex-wrap:wrap}
+  .tabbar{display:flex; gap:6px; flex-wrap:wrap}
+  .tabbar button{padding:6px 10px; font-size:13px}
+  .tabbar button.active{background:#2d6cdf}
+  .legend{display:flex; gap:10px; align-items:center; font-size:12px; opacity:.9; flex-wrap:wrap}
+  .legend .box{position:relative; width:40px; height:12px; background:#181818; border:1px solid var(--cell-bd)}
+  .legend .box .fill{height:100%}
+  .grid-wrap{overflow:auto; max-height:58vh; border-radius:10px; border:1px solid var(--panel-bd); background:var(--grid-bg)}
+  .grid{display:grid; grid-template-columns:repeat(13, minmax(22px, 1fr)); gap:1px; padding:1px}
+  .cell{position:relative; background:#181818; border:1px solid var(--cell-bd); aspect-ratio:1/1; min-width:24px;
+        display:flex; align-items:center; justify-content:center; font-size: clamp(9px, 1.9vw, 12px); color:var(--label);}
+  .fill{position:absolute; left:0; top:0; bottom:0; width:0%; background:var(--fill); opacity:.9}
 </style>
 </head>
 <body>
-  <h1>レンジ記憶トレ（6-max・オフライン｜UTG & HJ｜境界近傍優先・重複なし v4.3.1｜WebAudio・内訳表示・自動進行オフ）</h1>
+  <h1>solver plusレンジ記憶トレーニング（6-max・2.5bbオープン）</h1>
   <div class="app">
     <div class="row">
       <div class="col leftCol">
@@ -94,27 +121,65 @@
             <div class="coin bb-coin1" aria-hidden="true"></div>
             <div class="coin bb-coin2" aria-hidden="true"></div>
             <div class="coin sb-coin1" aria-hidden="true"></div>
-            <div class="seat s1" id="seatUTG">UTG</div>
-            <div class="seat s2" id="seatHJ">HJ</div>
-            <div class="seat s3">CO</div>
-            <div class="seat s4">BTN</div>
+
+            <div class="seat s1" id="seatUTG" data-pos="UTG">UTG</div>
+            <div class="seat s2" id="seatHJ" data-pos="HJ">HJ</div>
+            <div class="seat s3" id="seatCO" data-pos="CO">CO</div>
+            <div class="seat s4" id="seatBTN" data-pos="BTN">BTN</div>
             <div class="seat s5">SB</div>
             <div class="seat s6">BB</div>
           </div>
         </div>
+        <div class="panel" id="startPanel">
+          <div class="start-controls">
+            <div class="q">出題ポジションをテーブル上でタップして選択</div>
+            <div class="pos-help">選択中は青色にハイライト。もう一度タップで解除。</div>
+            <div style="display:flex; gap:8px; flex-wrap:wrap; justify-content:center">
+              <button id="openViewerBtn">レンジ表を見る</button>
+              <button id="startBtn" disabled>開始</button>
+            </div>
+            
+          </div>
+        </div>
+
+        <!-- Range Viewer Panel -->
+        <div class="viewer hidden" id="viewerPanel" aria-hidden="true" style="display:none">
+          <div class="viewer-header">
+            <div class="tabbar">
+              <button class="posTab active" data-pos="UTG">UTG</button>
+              <button class="posTab" data-pos="HJ">HJ</button>
+              <button class="posTab" data-pos="CO">CO</button>
+              <button class="posTab" data-pos="BTN">BTN</button>
+            </div>
+            <div style="display:flex; gap:8px">
+              <button id="closeViewerBtn">閉じる</button>
+            </div>
+          </div>
+          <div class="legend">
+            <div>凡例：</div>
+            <div class="box"><div class="fill" style="width:100%"></div></div><div>100%</div>
+            <div class="box"><div class="fill" style="width:75%"></div></div><div>75%</div>
+            <div class="box"><div class="fill" style="width:50%"></div></div><div>50%</div>
+            <div>（赤バーは<strong>左から</strong>割合分を塗ります。左上AA／右上A2s／左下A2o／右下22）</div>
+          </div>
+          <div class="grid-wrap">
+            <div class="grid" id="rangeGrid"></div>
+          </div>
+        </div>
       </div>
+
       <div class="col rightCol">
-        <div class="panel" id="quizPanel">
-          <p id="question" class="q"></p>
+        <div class="panel hidden" id="quizPanel">
+          <div class="panel-head">
+            <p id="question" class="q"></p>
+            <button id="quitBtn" class="btn-danger">やめる</button>
+          </div>
           <div class="meta">出題モード: <span id="modeTag" class="tag">境界＋近傍優先</span>（境界≫近傍≫フォールド＞純オープン）</div>
           <div id="hand-cards" class="cards"></div>
           <div class="controls"><div class="choices" id="buttons"></div></div>
           <div class="result" id="result"></div>
           <div class="sticky-next"><button id="nextBtn" class="hidden">次の問題へ</button></div>
           <div class="score">進行状況: <span id="progress">0</span>/10　｜　スコア合計: <span id="score">0</span></div>
-          <div class="sound-tip">
-            音が出ない？→ <button id="soundTestBtn">音テスト</button>（iPhoneは最初に押すと有効になります）
-          </div>
         </div>
 
         <div class="panel hidden" id="summaryPanel">
@@ -135,83 +200,111 @@
   </div>
 
 <script>
+/* ===== show/hide utils (robust) ===== */
+function hide(el){ if(!el) return; el.classList.add('hidden'); el.style.display='none'; el.setAttribute('aria-hidden','true'); }
+function show(el){ if(!el) return; el.classList.remove('hidden'); el.style.display='block'; el.setAttribute('aria-hidden','false'); }
+
 /* ===== Hand utils ===== */
 const RANKS = ["A","K","Q","J","T","9","8","7","6","5","4","3","2"];
-function toHand(i,j){ if (i===j) return RANKS[i]+RANKS[j]; if (j>i) return RANKS[i]+RANKS[j]+"o"; return RANKS[j]+RANKS[i]+"s"; }
-function allHands169(){ const out=[]; for(let i=0;i<RANKS.length;i++){ for(let j=0;j<RANKS.length;j++){ out.push(toHand(i,j)); } } return out; }
-
-/* ===== UTG map (unchanged) ===== */
-const UTG = Object.fromEntries(allHands169().map(h=>[h,0]));
-const U_OPEN100 = ["AA","KK","QQ","JJ","TT","99","88","77","66","AKs","AQs","AJs","ATs","A9s","A8s","A7s","A6s","A5s","A4s","A3s","A2s","KQs","KJs","KTs","K9s","QJs","QTs","JTs","T9s","AKo","AQo","AJo","KQo"];
-const U_OPEN75  = ["ATo","K8s","Q9s","KJo","J9s","55"];
-const U_OPEN50  = ["98s","87s","76s","65s","44"];
-for (const h of U_OPEN100) UTG[h]=100;
-for (const h of U_OPEN75)  UTG[h]=75;
-for (const h of U_OPEN50)  UTG[h]=50;
-
-/* ===== HJ map (A2s+; 55+ fix) ===== */
-const HJ = Object.fromEntries(allHands169().map(h=>[h,0]));
+function toHandGrid(i,j){
+  if (i===j) return RANKS[i]+RANKS[j];
+  if (i < j) return RANKS[i]+RANKS[j]+"s"; // top-right suited (A2s)
+  return RANKS[j]+RANKS[i]+"o";           // bottom-left offsuit (A2o)
+}
+function allHands169(){ const out=[]; for(let i=0;i<RANKS.length;i++){ for(let j=0;j<RANKS.length;j++){ out.push(toHandGrid(i,j)); } } return out; }
 const ORDER = ["A","K","Q","J","T","9","8","7","6","5","4","3","2"];
-function setPairsAtLeast(lowRank){
+function shuffle(arr){ for(let i=arr.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [arr[i],arr[j]]=[arr[j],arr[i]]; } return arr; }
+
+/* ===== position maps ===== */
+const UTG = Object.fromEntries(allHands169().map(h=>[h,0]));
+const HJ  = Object.fromEntries(allHands169().map(h=>[h,0]));
+const CO  = Object.fromEntries(allHands169().map(h=>[h,0]));
+const BTN = Object.fromEntries(allHands169().map(h=>[h,0]));
+
+/* helpers */
+function setPairsAtLeast(map, lowRank){
   const start = ORDER.indexOf(lowRank);
   for (let idx=start; idx>=0; idx--){
     const r = ORDER[idx];
-    HJ[r+r] = 100;
+    map[r+r] = 100;
   }
 }
-setPairsAtLeast("5"); // 55+
-
-// A2s+ (suited only)
-for (let i=ORDER.indexOf("2"); i>=1; i--){
-  const r = ORDER[i];
-  HJ["A"+r+"s"]=100;
+function addLeftFixedPlus(map, left, right, type){
+  const idx = ORDER.indexOf(right);
+  if (idx === -1) return;
+  const h1 = left + right + type; map[h1]=100;
+  if (idx-1 >= 0){ const next = ORDER[idx-1]; const h2 = left + next + type; map[h2]=100; }
 }
+
+/* ===== UTG data ===== */
+for (const h of ["AA","KK","QQ","JJ","TT","99","88","77","66","AKs","AQs","AJs","ATs","A9s","A8s","A7s","A6s","A5s","A4s","A3s","A2s","KQs","KJs","KTs","K9s","QJs","QTs","JTs","T9s","AKo","AQo","AJo","KQo"]) UTG[h]=100;
+for (const h of ["ATo","K8s","Q9s","KJo","J9s","55"]) UTG[h]=75;
+for (const h of ["98s","87s","76s","65s","44"]) UTG[h]=50;
+
+/* ===== HJ data ===== */
+setPairsAtLeast(HJ,"5");
+for (let i=ORDER.indexOf("2"); i>=1; i--){ const r=ORDER[i]; HJ["A"+r+"s"]=100; }
 HJ["AA"]=100;
-
-// K8s+
-for (const r of ["8","9","T","J","Q"]){ HJ["K"+r+"s"]=100; }
-HJ["AKs"]=100;
-
-// Q9s+
-for (const r of ["9","T","J"]){ HJ["Q"+r+"s"]=100; }
-HJ["KQs"]=100; HJ["AQs"]=100;
-
-// J9s
+for (const r of ["8","9","T","J","Q"]){ HJ["K"+r+"s"]=100; } HJ["AKs"]=100;
+for (const r of ["9","T","J"]){ HJ["Q"+r+"s"]=100; } HJ["KQs"]=100; HJ["AQs"]=100;
 HJ["J9s"]=100;
-
-// ATo+ (offsuit)
 for (const r of ["T","J","Q","K"]){ HJ["A"+r+"o"]=100; }
-
-// KJo+ (offsuit)
 HJ["KJo"]=100; HJ["KQo"]=100;
-
-// suited connectors 54s〜KQs
-const CONNECTORS=[["5","4"],["6","5"],["7","6"],["8","7"],["9","8"],["T","9"],["J","T"],["Q","J"],["K","Q"]];
-for (const [hi,lo] of CONNECTORS){ HJ[hi+lo+"s"]=100; }
-
-// 75%：QJo、K7s、T8s、43s、44、33
-HJ["QJo"]=75; HJ["K7s"]=75; HJ["T8s"]=75; HJ["43s"]=75; HJ["44"]=75; HJ["33"]=75;
-
-// Safety: explicitly ensure
+for (const [hi,lo] of [["5","4"],["6","5"],["7","6"],["8","7"],["9","8"],["T","9"],["J","T"],["Q","J"],["K","Q"]]) HJ[hi+lo+"s"]=100;
+for (const h of ["QJo","K7s","T8s","43s","44","33"]) HJ[h]=75;
 HJ["A8s"]=100; HJ["JJ"]=100;
 
-/* ===== Data assembly with Position ===== */
-function toData(map, pos){ return Object.entries(map).map(([Hand,Frequency])=>({Position:pos, Hand, Frequency})); }
-const DATA_UTG = toData(UTG, "UTG");
-const DATA_HJ  = toData(HJ,  "HJ");
+/* ===== CO data (with corrections) ===== */
+setPairsAtLeast(CO,"2"); // 22+
+for (let i=ORDER.indexOf("2"); i>=1; i--){ const r=ORDER[i]; CO["A"+r+"s"]=100; } // A2s+
+for (const r of ["4","5","6","7","8","9","T","J","Q"]){ CO["K"+r+"s"]=100; } // K4s+
+for (const r of ["7","8","9","T","J"]){ CO["Q"+r+"s"]=100; } // Q7s+
+CO["J7s"]=100; CO["T7s"]=100;
+addLeftFixedPlus(CO, "9", "7", "s"); // 97s, 98s
+addLeftFixedPlus(CO, "8", "6", "s"); // 86s, 87s
+for (const [hi,lo] of [["5","4"],["6","5"],["7","6"],["8","7"],["9","8"],["T","9"],["J","T"],["Q","J"],["K","Q"]]) CO[hi+lo+"s"]=100;
+for (const r of ["8","9","T","J","Q","K"]){ CO["A"+r+"o"]=100; }
+for (const h of ["KTo","KJo","KQo","QTo","JTo"]) CO[h]=100;
+for (const h of ["A7o","K3s","Q6s","43s"]) CO[h]=75;
+// Corrections
+CO["QJo"]=100; CO["J9s"]=100; CO["J8s"]=100; CO["T8s"]=100;
 
-/* Boundary & neighbors per position */
+/* ===== BTN data (with corrections) ===== */
+setPairsAtLeast(BTN,"2"); // 22+
+for (let i=ORDER.indexOf("2"); i>=1; i--){ const r=ORDER[i]; BTN["A"+r+"s"]=100; } // A2s+
+for (let i=ORDER.indexOf("2"); i>=1; i--){ const r=ORDER[i]; BTN["K"+r+"s"]=100; } // K2s+
+for (let i=ORDER.indexOf("3"); i>=1; i--){ const r=ORDER[i]; BTN["Q"+r+"s"]=100; } // Q3s+
+BTN["J5s"]=100; BTN["T6s"]=100;
+addLeftFixedPlus(BTN, "9", "6", "s"); // 96s, 97s
+addLeftFixedPlus(BTN, "8", "6", "s"); // 86s, 87s
+addLeftFixedPlus(BTN, "7", "5", "s"); // 75s, 76s
+addLeftFixedPlus(BTN, "6", "4", "s"); // 64s, 65s
+for (let i=ORDER.indexOf("4"); i>=1; i--){ const r=ORDER[i]; BTN["A"+r+"o"]=100; } // A4o+
+for (const r of ["9","T","J","Q","K"]){ BTN["K"+r+"o"]=100; }
+for (const r of ["9","T","J","Q","K"]){ BTN["Q"+r+"o"]=100; }
+for (const r of ["8","9","T","J","Q","K"]){ BTN["J"+r+"o"]=100; }
+for (const r of ["8","9","T","J","Q","K"]){ BTN["T"+r+"o"]=100; }
+BTN["98o"]=100;
+for (const h of ["A3o","A2o","K8s","Q2s","J4s","85s","63s","53s","43s"]) BTN[h]=75;
+// Corrections: set to 100
+for (const h of ["JTs","J9s","J8s","J7s","J6s","T9s","T8s","T7s","K8s","98s","54s"]) BTN[h]=100;
+
+/* ===== data helpers ===== */
+function getMap(pos){ return pos==="UTG"?UTG:pos==="HJ"?HJ:pos==="CO"?CO:BTN; }
+function toData(map,pos){ return Object.entries(map).map(([Hand,Frequency])=>({Position:pos, Hand, Frequency})); }
+const DATA = { UTG: toData(UTG,"UTG"), HJ: toData(HJ,"HJ"), CO: toData(CO,"CO"), BTN: toData(BTN,"BTN") };
+
+/* ===== boundary & neighbors for quiz ===== */
 function boundarySetOf(map){ return new Set(Object.entries(map).filter(([,f])=>f===50||f===75).map(([h])=>h)); }
-const BOUNDARY_UTG = boundarySetOf(UTG);
-const BOUNDARY_HJ  = boundarySetOf(HJ);
+const BOUNDARY = { UTG: boundarySetOf(UTG), HJ: boundarySetOf(HJ), CO: boundarySetOf(CO), BTN: boundarySetOf(BTN) };
 
 function fromHandOrder(hand){
   if (hand.length===2){ const r = ORDER.indexOf(hand[0]); return {i:r,j:r}; }
   const a=hand[0], b=hand[1], t=hand[2];
   const ia=ORDER.indexOf(a), ib=ORDER.indexOf(b);
-  return t==="o" ? {i:ia,j:ib} : {i:ib,j:ia};
+  return t==="s" ? {i:ia,j:ib} : {i:ib,j:ia};
 }
-function toHandOrder(i,j){ if (i===j) return ORDER[i]+ORDER[i]; if (j>i) return ORDER[i]+ORDER[j]+"o"; return ORDER[j]+ORDER[i]+"s"; }
+function toHandOrder(i,j){ return toHandGrid(i,j); }
 function neighborsOf(handSet){
   const out = new Set();
   for (const h of handSet){
@@ -227,19 +320,18 @@ function neighborsOf(handSet){
   }
   return out;
 }
-const NEAR_UTG = neighborsOf(BOUNDARY_UTG);
-const NEAR_HJ  = neighborsOf(BOUNDARY_HJ);
+const NEAR = { UTG: neighborsOf(BOUNDARY.UTG), HJ: neighborsOf(BOUNDARY.HJ), CO: neighborsOf(BOUNDARY.CO), BTN: neighborsOf(BOUNDARY.BTN) };
 
-/* ===== Weighted sampler per position ===== */
+/* ===== weighted sampler ===== */
 function bucketsFor(pos){
-  const DATA = pos==="UTG" ? DATA_UTG : DATA_HJ;
-  const BOUND = pos==="UTG" ? BOUNDARY_UTG : BOUNDARY_HJ;
-  const NEAR  = pos==="UTG" ? NEAR_UTG : NEAR_HJ;
-  const boundary = DATA.filter(d=>BOUND.has(d.Hand));
-  const nearB    = DATA.filter(d=>NEAR.has(d.Hand) && !BOUND.has(d.Hand));
-  const foldsNear = DATA.filter(d=>d.Frequency===0 && NEAR.has(d.Hand));
-  const foldsOther= DATA.filter(d=>d.Frequency===0 && !NEAR.has(d.Hand));
-  const pure     = DATA.filter(d=>d.Frequency===100);
+  const DATASET = DATA[pos];
+  const BOUND = BOUNDARY[pos];
+  const NEARSET  = NEAR[pos];
+  const boundary = DATASET.filter(d=>BOUND.has(d.Hand));
+  const nearB    = DATASET.filter(d=>NEARSET.has(d.Hand) && !BOUND.has(d.Hand));
+  const foldsNear = DATASET.filter(d=>d.Frequency===0 && NEARSET.has(d.Hand));
+  const foldsOther= DATASET.filter(d=>d.Frequency===0 && !NEARSET.has(d.Hand));
+  const pure     = DATASET.filter(d=>d.Frequency===100);
   return {boundary, nearB, foldsNear, foldsOther, pure};
 }
 function repeat(arr, times){ const out=[]; for(let t=0;t<times;t++) out.push(...arr); return out; }
@@ -256,14 +348,37 @@ function pickOne(pos){
   return weighted[Math.floor(Math.random()*weighted.length)];
 }
 
-/* ===== Quiz (no duplicates by Position+Hand) ===== */
+/* ===== seat-based position picker ===== */
+const POS_IDS = ["UTG","HJ","CO","BTN"];
+const selectedPositions = new Set(POS_IDS); // default: all selected
+for (const id of POS_IDS){
+  const el = document.getElementById("seat"+id);
+  el.addEventListener("click", ()=>{
+    if (selectedPositions.has(id)) selectedPositions.delete(id); else selectedPositions.add(id);
+    refreshPickVisuals();
+    updateStartButton();
+  });
+}
+function updateStartButton(){ document.getElementById("startBtn").disabled = selectedPositions.size===0; }
+updateStartButton();
+refreshPickVisuals();
+
+/* ===== Quiz controls ===== */
 const CHOICES = [0,25,50,75,100];
 const QUIZ_LEN = 10;
 let quizPool=[], usedSet=new Set();
+let questionIndex=0, current=null, history=[], inReview=false;
+let startTime=0;
+let basePoints=0, bonusPoints=0;
+function totalScore(){ return basePoints + bonusPoints; }
+
 function buildQuizPool(){
   quizPool=[]; usedSet.clear();
-  while (quizPool.length<QUIZ_LEN){
-    const pos = Math.random()<0.5 ? "UTG" : "HJ";
+  const posList = Array.from(selectedPositions);
+  let attempts = 0, maxAttempts = 3000;
+  while (quizPool.length < QUIZ_LEN && attempts < maxAttempts){
+    attempts++;
+    const pos = posList[Math.floor(Math.random()*posList.length)];
     const cand = pickOne(pos);
     if (!cand) continue;
     const key = pos+"|"+cand.Hand;
@@ -271,9 +386,65 @@ function buildQuizPool(){
     usedSet.add(key);
     quizPool.push(cand);
   }
+  if (quizPool.length < QUIZ_LEN){
+    const pool = [];
+    for (const pos of posList){ pool.push(...DATA[pos]); }
+    for (let i=pool.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [pool[i],pool[j]]=[pool[j],pool[i]]; }
+    for (const cand of pool){
+      const key = cand.Position+"|"+cand.Hand;
+      if (usedSet.has(key)) continue;
+      usedSet.add(key);
+      quizPool.push(cand);
+      if (quizPool.length >= QUIZ_LEN) break;
+    }
+  }
 }
 
-/* ===== WebAudio sound engine ===== */
+function refreshPickVisuals(){
+  // apply blue 'pick' to selected positions (start screen)
+  for (const id of POS_IDS){
+    const el = document.getElementById("seat"+id);
+    el.classList.toggle('pick', selectedPositions.has(id));
+  }
+}
+function clearPickVisuals(){
+  for (const id of POS_IDS){
+    const el = document.getElementById("seat"+id);
+    el.classList.remove('pick');
+  }
+}
+function setActiveSeat(pos){
+  // During quiz: only the asked pos should be blue. Use 'focus' (not 'pick').
+  for (const id of POS_IDS){
+    const el = document.getElementById("seat"+id);
+    el.classList.remove('active');
+    el.classList.toggle('focus', pos===id);
+  }
+}
+function suitColorClass(s){ return (s==="H"||s==="D") ? "red" : "black"; }
+const SUIT_SYMBOL = {S:"♠", H:"♥", D:"♦", C:"♣"};
+function handToCards(hand){
+  if (hand.length===2){ return [hand[0]+"S", hand[1]+"H"]; }
+  const r1 = hand[0], r2 = hand[1], type = hand[2];
+  if (type==="s"){ return [r1+"S", r2+"S"]; }
+  return [r1+"S", r2+"H"];
+}
+function rankText(r){ return r==="T" ? "10" : r; }
+function makeCardElement(code){
+  const r = code[0], s = code[1];
+  const colorCls = suitColorClass(s);
+  const el = document.createElement("div"); el.className = "card";
+  const rankTop = Object.assign(document.createElement("div"), {className:`rank ${colorCls}`, textContent: rankText(r)});
+  const suitTop = Object.assign(document.createElement("div"), {className:`suit ${colorCls}`, textContent: SUIT_SYMBOL[s]});
+  const rankBottom = document.createElement("div"); rankBottom.className = `rank bottom ${colorCls}`; rankBottom.textContent = rankText(r);
+  const suitBottom = document.createElement("div"); suitBottom.className = `suit bottom ${colorCls}`; suitBottom.textContent = SUIT_SYMBOL[s];
+  const pip = document.createElement("div"); pip.className = `pip ${colorCls}`; pip.textContent = SUIT_SYMBOL[s];
+  el.append(rankTop,suitTop,pip,rankBottom,suitBottom);
+  return el;
+}
+(function renderButtons(){ const cont=document.getElementById("buttons"); cont.innerHTML = CHOICES.map(c=>`<button data-choice="${c}">${c}%</button>`).join(""); })();
+
+/* sounds */
 let audioCtx = null;
 function ensureAudio(){
   if (!audioCtx){
@@ -302,49 +473,47 @@ function beep({freq=880, duration=0.15, type="sine", gain=0.04}={}){
 function playCorrect(){ beep({freq:980, duration:0.12, type:"sine"}); setTimeout(()=>beep({freq:1318.5, duration:0.12, type:"sine"}), 110); }
 function playWrong(){ beep({freq:220, duration:0.15, type:"square"}); setTimeout(()=>beep({freq:180, duration:0.18, type:"square"}), 120); }
 document.addEventListener("click", ensureAudio, {once:true});
-document.getElementById("soundTestBtn").addEventListener("click", ()=>{ ensureAudio(); playCorrect(); });
+(()=>{ const st=document.getElementById("soundTestBtn"); if(st){ st.addEventListener("click", ()=>{ ensureAudio(); playCorrect(); }); } })();
 
-/* ===== Timing & Scoring ===== */
-let questionIndex=0, current=null, history=[], inReview=false;
-let startTime=0;
-let basePoints=0, bonusPoints=0; // 内訳
-function totalScore(){ return basePoints + bonusPoints; }
-const CHOICES_ORDER = [0,25,50,75,100];
-
-function suitColorClass(s){ return (s==="H"||s==="D") ? "red" : "black"; }
-const SUIT_SYMBOL = {S:"♠", H:"♥", D:"♦", C:"♣"};
-function handToCards(hand){
-  if (hand.length===2){ return [hand[0]+"S", hand[1]+"H"]; }
-  const r1 = hand[0], r2 = hand[1], type = hand[2];
-  if (type==="s"){ return [r1+"S", r2+"S"]; }
-  return [r1+"S", r2+"H"];
-}
-function rankText(r){ return r==="T" ? "10" : r; }
-function makeCardElement(code){
-  const r = code[0], s = code[1];
-  const colorCls = suitColorClass(s);
-  const el = document.createElement("div"); el.className = "card";
-  const rankTop = Object.assign(document.createElement("div"), {className:`rank ${colorCls}`, textContent: rankText(r)});
-  const suitTop = Object.assign(document.createElement("div"), {className:`suit ${colorCls}`, textContent: SUIT_SYMBOL[s]});
-  const rankBottom = Object.assign(document.createElement("div"), {className:`rank bottom ${colorCls}`, textContent: rankText(r)});
-  const suitBottom = Object.assign(document.createElement("div"), {className:`suit bottom ${colorCls}`, textContent: SUIT_SYMBOL[s]});
-  const pip = Object.assign(document.createElement("div"), {className:`pip ${colorCls}`, textContent: SUIT_SYMBOL[s]});
-  el.append(rankTop,suitTop,pip,rankBottom,suitBottom);
-  return el;
-}
-function shuffle(arr){ for(let i=arr.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [arr[i],arr[j]]=[arr[j],arr[i]]; } return arr; }
-function nearestBucket(freq){ return CHOICES.reduce((p,c)=> Math.abs(c-freq) < Math.abs(p-freq) ? c : p, CHOICES[0]); }
-function setActiveSeat(pos){
-  document.getElementById("seatUTG").classList.toggle("active", pos==="UTG");
-  document.getElementById("seatHJ").classList.toggle("active", pos==="HJ");
-}
-
-function renderButtons(){
-  const cont = document.getElementById("buttons");
-  cont.innerHTML = CHOICES_ORDER.map(c=>`<button data-choice="${c}">${c}%</button>`).join("");
-}
-renderButtons();
-
+/* interactions */
+const viewerPanel = document.getElementById("viewerPanel");
+document.getElementById("startBtn").addEventListener("click", ()=>{
+  ensureAudio();
+  hide(viewerPanel); // hide viewer on start
+  document.getElementById("startPanel").classList.add("hidden");
+  document.getElementById("quizPanel").classList.remove("hidden");
+  clearPickVisuals();
+  // reset round state
+  questionIndex = 0; basePoints = 0; bonusPoints = 0; history = []; inReview = false;
+  quizPool = []; usedSet = new Set();
+  document.getElementById("score").textContent="0"; document.getElementById("progress").textContent="0";
+  document.getElementById("result").textContent="";
+  // Build pool deterministically now
+  buildQuizPool();
+  if (!quizPool || quizPool.length === 0){
+    const posList = Array.from(selectedPositions);
+    let pool = [];
+    for (const pos of (posList.length?posList:["UTG","HJ","CO","BTN"])) pool = pool.concat(DATA[pos]);
+    for (let i=pool.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [pool[i],pool[j]]=[pool[j],pool[i]]; }
+    for (const item of pool){
+      const key = item.Position+"|"+item.Hand;
+      if (usedSet.has(key)) continue;
+      usedSet.add(key);
+      quizPool.push(item);
+      if (quizPool.length >= QUIZ_LEN) break;
+    }
+  }
+  // Last-resort fallback: synthesize one item if still empty
+  if (!quizPool || quizPool.length === 0){
+    const posList = Array.from(selectedPositions);
+    const pos = posList.length ? posList[0] : "UTG";
+    const freq = getMap(pos)["AA"] || 100;
+    quizPool = [{Position: pos, Hand: "AA", Frequency: freq}];
+  }
+  // Ensure quiz panel truly visible
+  show(document.getElementById("quizPanel"));
+  newQuestion();
+});
 document.getElementById("buttons").addEventListener("click",(e)=>{
   const btn = e.target.closest("button[data-choice]"); if(!btn) return;
   ensureAudio();
@@ -355,15 +524,72 @@ document.getElementById("nextBtn").addEventListener("click",()=>{
   ensureAudio();
   if (inReview) onNextFromWrong_Review(); else onNextFromWrong_Quiz();
 });
-document.getElementById("restartBtn").addEventListener("click", ()=>{ ensureAudio(); restartQuiz(); });
+document.getElementById("restartBtn").addEventListener("click", ()=>{
+  ensureAudio();
+  quitToStart();
+});
 document.getElementById("startReviewBtn").addEventListener("click", ()=>{ ensureAudio(); startReview(); });
+document.getElementById("openViewerBtn").addEventListener("click", ()=>{
+  show(viewerPanel);
+  renderGrid("UTG");
+});
+document.getElementById("closeViewerBtn").addEventListener("click", ()=>{
+  hide(viewerPanel);
+});
+document.getElementById("quitBtn").addEventListener("click", ()=>{
+  ensureAudio();
+  quitToStart();
+});
+document.querySelectorAll(".posTab").forEach(btn=>{
+  btn.addEventListener("click", ()=>{
+    document.querySelectorAll(".posTab").forEach(b=>b.classList.remove("active"));
+    btn.classList.add("active");
+    renderGrid(btn.dataset.pos);
+  });
+});
 
+/* quit helper */
+function quitToStart(){
+  hide(document.getElementById("quizPanel"));
+  hide(document.getElementById("summaryPanel"));
+  show(document.getElementById("startPanel"));
+  hide(viewerPanel); // keep viewer hidden
+  // remove any focus highlight and restore picks
+  for (const id of POS_IDS){ document.getElementById('seat'+id).classList.remove('focus'); }
+  refreshPickVisuals();
+  // reset all state
+  quizPool = []; usedSet = new Set(); questionIndex = 0; current = null; history = [];
+  inReview = false; reviewQueue = []; reviewIndex = 0; nextRoundQueue = [];
+  basePoints = 0; bonusPoints = 0;
+  document.getElementById("score").textContent="0";
+  document.getElementById("progress").textContent="0";
+  document.getElementById("result").textContent="";
+  updateStartButton();
+}
+
+/* quiz flow */
 function newQuestion(){
-  if (questionIndex === 0){ buildQuizPool(); }
-  if (questionIndex >= QUIZ_LEN){ return endQuiz(); }
+  if (questionIndex === 0) { buildQuizPool(); }
+  if (!quizPool || quizPool.length === 0) { buildQuizPool(); }
+  if (questionIndex >= QUIZ_LEN) { return endQuiz(); }
   current = quizPool[questionIndex];
+  if (!current) {
+    const posList = Array.from(selectedPositions);
+    let pool = [];
+    for (const pos of posList) { pool = pool.concat(DATA[pos]); }
+    if (pool.length === 0) { for (const pos of ["UTG","HJ","CO","BTN"]) { pool = pool.concat(DATA[pos]); } }
+    if (pool.length > 0){
+      current = pool[Math.floor(Math.random()*pool.length)];
+    } else {
+      // final-final fallback
+      current = {Position:"UTG", Hand:"AA", Frequency:100};
+    }
+    if (quizPool.length <= questionIndex) quizPool.push(current);
+  }
+  // make sure quiz panel is visible
+  show(document.getElementById("quizPanel"));
   setActiveSeat(current.Position);
-  document.getElementById("question").textContent = `${current.Position}: ${current.Hand} はオープン何%？`;
+  document.getElementById("question").textContent = `${current.Position}: ${current.Hand} のオープン頻度は何%？`;
   const container = document.getElementById("hand-cards");
   container.innerHTML="";
   handToCards(current.Hand).forEach(c => container.appendChild(makeCardElement(c)));
@@ -371,6 +597,8 @@ function newQuestion(){
   document.getElementById("nextBtn").classList.add("hidden");
   startTime = performance.now();
 }
+function nearestBucket(freq){ return CHOICES.reduce((p,c)=> Math.abs(c-freq) < Math.abs(p-freq) ? c : p, CHOICES[0]); }
+function updateProgress(){ document.getElementById("progress").textContent = String(questionIndex); }
 function handleAnswer(choice){
   const nearest = nearestBucket(current.Frequency);
   const correct = (choice === nearest);
@@ -378,10 +606,9 @@ function handleAnswer(choice){
   const cat = (current.Frequency===0) ? "フォールド" : (current.Frequency===100 ? "純オープン" : "境界");
   if (correct){
     const bonus = elapsedSec <= 3 ? 3 : (elapsedSec <= 5 ? 1 : 0);
-    basePoints += 1;
-    bonusPoints += bonus;
+    basePoints += 1; bonusPoints += bonus;
     document.getElementById("score").textContent = String(totalScore());
-    document.getElementById("result").textContent = `✅ 正解！ 正解:${nearest}%（実際:${current.Frequency}%）｜${current.Position}｜カテゴリ:${cat} ｜ 経過 ${elapsedSec.toFixed(2)} 秒 ／ ボーナス +${bonus}`;
+    document.getElementById("result").textContent = `✅ 正解！ 正解:${nearest}%（実際:${current.Frequency}%）｜${current.Position}｜カテゴリ:${cat} ｜ ${elapsedSec.toFixed(2)}秒 ／ ボーナス +${bonus}`;
     playCorrect();
     questionIndex++; updateProgress(); setTimeout(newQuestion, 800);
   } else {
@@ -392,7 +619,6 @@ function handleAnswer(choice){
   history.push({pos: current.Position, hand: current.Hand, freq: current.Frequency, choice, nearest, correct, elapsedSec});
 }
 function onNextFromWrong_Quiz(){ questionIndex++; updateProgress(); newQuestion(); }
-function updateProgress(){ document.getElementById("progress").textContent = String(questionIndex); }
 
 function endQuiz(){
   document.getElementById("quizPanel").classList.add("hidden");
@@ -415,17 +641,7 @@ function endQuiz(){
   }
 }
 
-function restartQuiz(){
-  inReview = false; questionIndex = 0; basePoints = 0; bonusPoints = 0; history = [];
-  document.getElementById("progress").textContent = "0";
-  document.getElementById("score").textContent = "0";
-  document.getElementById("result").textContent = "";
-  document.getElementById("summaryPanel").classList.add("hidden");
-  document.getElementById("quizPanel").classList.remove("hidden");
-  newQuestion();
-}
-
-/* Review loop (no scoring; no auto-next after completion) */
+/* review */
 let reviewQueue = [], reviewIndex = 0, nextRoundQueue = [];
 function startReview(){
   if (!reviewQueue.length) return;
@@ -447,7 +663,6 @@ function nextReviewQuestion(){
       document.getElementById("quizPanel").classList.add("hidden");
       document.getElementById("summaryPanel").classList.remove("hidden");
       document.getElementById("summaryTitle").innerHTML = '結果まとめ　<span class="success">復習完了！</span>';
-      // no auto restart
     }
     return;
   }
@@ -477,13 +692,23 @@ function handleReviewAnswer(choice){
 }
 function onNextFromWrong_Review(){ reviewIndex++; nextReviewQuestion(); }
 
-// Debug pairs (seen in console)
-console.log("HJ pairs 55+ status:", ["55","66","77","88","99","TT","JJ","QQ","KK","AA"].map(p=>p+":"+HJ[p]));
-
-// Init
-quizPool = [];
-usedSet = new Set();
-newQuestion();
+/* ===== Range Viewer render ===== */
+const rangeGrid = document.getElementById("rangeGrid");
+function renderGrid(pos){
+  const map = getMap(pos);
+  rangeGrid.innerHTML = "";
+  for (let i=0; i<RANKS.length; i++){
+    for (let j=0; j<RANKS.length; j++){
+      const hand = toHandGrid(i,j);
+      const freq = map[hand] || 0;
+      const cell = document.createElement("div"); cell.className="cell";
+      const fill = document.createElement("div"); fill.className="fill"; fill.style.width = (freq||0) + "%";
+      const label = document.createElement("div"); label.textContent = hand; label.style.position="relative"; label.style.zIndex=1;
+      cell.appendChild(fill); cell.appendChild(label);
+      rangeGrid.appendChild(cell);
+    }
+  }
+}
 </script>
 </body>
 </html>
