@@ -3,19 +3,18 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>UTGレンジ記憶トレ（6-max・UTG・169ハンド・境界近傍優先｜重複なし v2・コイン＆座標微調整）</title>
+<title>レンジ記憶トレ（6-max｜UTG & HJ｜境界近傍優先・重複なし v4.3.1｜WebAudio・ボーナス内訳・自動進行オフ）</title>
 <style>
   :root {
-    --table-green: #116b3b; --felt: #0c7a43; --seat:#444; --seat-text:#fff; --utg:#e53935;
+    --table-green: #116b3b; --felt: #0c7a43; --seat:#444; --seat-text:#fff; --active:#e53935;
     --bg:#111; --card-bg:#fff; --card-outline:#ddd; --panel-bg:#1b1b1b; --panel-bd:#2d2d2d;
   }
   html,body{margin:0;padding:0;background:var(--bg);color:#eee;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Hiragino Kaku Gothic ProN","Yu Gothic UI","Yu Gothic","Noto Sans JP","Meiryo",sans-serif}
   body{min-height:100vh;display:flex;flex-direction:column}
   h1{font-size:18px;margin:10px 8px;text-align:center;line-height:1.2}
   .app{width:100%;max-width:1100px;margin:0 auto;padding:6px;display:flex;flex-direction:column;gap:8px;flex:1}
-  .row{display:flex;gap:10px;flex-direction:column;} 
+  .row{display:flex;gap:10px;flex-direction:column;}
   .col{display:flex;flex-direction:column;gap:8px;flex:1}
-  /* Poker table */
   .table-wrap{display:flex;justify-content:center}
   .table{
     position:relative;
@@ -26,7 +25,6 @@
     box-shadow: 0 10px 30px rgba(0,0,0,.45) inset, 0 8px 24px rgba(0,0,0,.35);
     overflow:hidden;
   }
-  /* Coins */
   .coin{
     position:absolute; width:18px; height:18px; border-radius:50%;
     background: radial-gradient(circle at 30% 30%, #f7e27d 0%, #efd463 35%, #e0b83a 65%, #b8862e 100%);
@@ -34,31 +32,22 @@
     box-shadow: 0 1px 0 rgba(255,255,255,.35) inset, 0 2px 4px rgba(0,0,0,.4);
     transform: rotate(-8deg);
     opacity:.95;
-    z-index: 2;
+    z-index: 1;
   }
-  .coin::after{
-    content:""; position:absolute; left:3px; top:3px; width:7px; height:3px; border-radius:50%;
-    background: rgba(255,255,255,.55);
-    filter: blur(0.2px);
-  }
-  /* moved further inside and away from SB/BB labels */
+  .coin::after{content:""; position:absolute; left:3px; top:3px; width:7px; height:3px; border-radius:50%;
+    background: rgba(255,255,255,.55); filter: blur(0.2px);}
   .bb-coin1{ top:25%; left:20%; }
   .bb-coin2{ top:28%; left:24%; transform: rotate(12deg); }
   .sb-coin1{ bottom:25%; left:20%; transform: rotate(-3deg); }
-
   .seat{position:absolute; width:54px;height:24px;background:var(--seat);color:var(--seat-text);
-        border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:11px;opacity:.95; z-index:3}
-  .seat.utg{background:var(--utg);font-weight:700;opacity:1}
-  /* keep fully inside table with safe margins */
-  .s1{top:2%; left:50%; transform:translateX(-50%)} /* UTG */
-  .s2{top:19%; right:6%} .s3{bottom:19%; right:6%}
-  .s4{bottom:2%; left:50%; transform:translateX(-50%)} /* BTN */
-  .s5{bottom:19%; left:6%} .s6{top:19%; left:6%}
-  /* Panels */
+        border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:11px;opacity:.95; z-index:2}
+  .seat.active{background:var(--active);font-weight:700}
+  .s1{top:2%;left:50%;transform:translateX(-50%)} /* UTG */
+  .s2{top:19%;right:6%} .s3{bottom:19%;right:6%} .s4{bottom:2%;left:50%;transform:translateX(-50%)} /* BTN */
+  .s5{bottom:19%;left:6%} .s6{top:19%;left:6%}
   .panel{background:var(--panel-bg);border:1px solid var(--panel-bd);border-radius:12px;padding:10px;display:flex;flex-direction:column;gap:8px}
   .q{font-size:16px;text-align:center;margin:0}
   .cards{display:flex;justify-content:center;gap:8px;flex-wrap:wrap}
-  /* Card */
   .card{width:78px;height:112px;background:var(--card-bg);border-radius:10px;border:1px solid var(--card-outline);
         position:relative;box-shadow:0 4px 12px rgba(0,0,0,.35)}
   .rank{position:absolute;left:6px;top:4px;font-weight:700;font-size:20px}
@@ -67,7 +56,6 @@
   .suit.bottom{left:auto;right:6px;bottom:24px;top:auto;transform:rotate(180deg)}
   .pip{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);font-size:40px}
   .black{color:#111} .red{color:#c62828}
-  /* Controls */
   .controls{display:flex;justify-content:center;gap:8px;flex-wrap:wrap}
   .choices{display:grid;grid-template-columns:repeat(5,1fr);gap:6px}
   button{padding:8px 10px;border-radius:10px;border:1px solid #3a3a3a;background:#222;color:#eee;font-size:14px}
@@ -93,10 +81,11 @@
     .choices{grid-template-columns:repeat(5, minmax(56px,1fr))}
     #nextBtn{max-width:220px}
   }
+  .sound-tip{font-size:12px; opacity:.85; text-align:center;}
 </style>
 </head>
 <body>
-  <h1>UTGレンジ記憶トレ（6-max・オフライン・境界近傍優先｜重複なし v2・コイン＆座標微調整）</h1>
+  <h1>レンジ記憶トレ（6-max・オフライン｜UTG & HJ｜境界近傍優先・重複なし v4.3.1｜WebAudio・内訳表示・自動進行オフ）</h1>
   <div class="app">
     <div class="row">
       <div class="col leftCol">
@@ -105,9 +94,8 @@
             <div class="coin bb-coin1" aria-hidden="true"></div>
             <div class="coin bb-coin2" aria-hidden="true"></div>
             <div class="coin sb-coin1" aria-hidden="true"></div>
-
-            <div class="seat s1 utg">UTG</div>
-            <div class="seat s2">HJ</div>
+            <div class="seat s1" id="seatUTG">UTG</div>
+            <div class="seat s2" id="seatHJ">HJ</div>
             <div class="seat s3">CO</div>
             <div class="seat s4">BTN</div>
             <div class="seat s5">SB</div>
@@ -120,47 +108,382 @@
           <p id="question" class="q"></p>
           <div class="meta">出題モード: <span id="modeTag" class="tag">境界＋近傍優先</span>（境界≫近傍≫フォールド＞純オープン）</div>
           <div id="hand-cards" class="cards"></div>
-          <div class="controls">
-            <div class="choices" id="buttons"></div>
-          </div>
+          <div class="controls"><div class="choices" id="buttons"></div></div>
           <div class="result" id="result"></div>
-          <div class="sticky-next">
-            <button id="nextBtn" class="hidden">次の問題へ</button>
+          <div class="sticky-next"><button id="nextBtn" class="hidden">次の問題へ</button></div>
+          <div class="score">進行状況: <span id="progress">0</span>/10　｜　スコア合計: <span id="score">0</span></div>
+          <div class="sound-tip">
+            音が出ない？→ <button id="soundTestBtn">音テスト</button>（iPhoneは最初に押すと有効になります）
           </div>
-          <div class="score">進行状況: <span id="progress">0</span>/10　｜　スコア: <span id="score">0</span></div>
         </div>
 
         <div class="panel hidden" id="summaryPanel">
           <div class="q" id="summaryTitle">結果まとめ</div>
-          <div class="score">スコア: <span id="finalScore">0</span> / 10</div>
+          <div class="score" id="finalBreakdown">最終スコア: 0点 + ボーナス0点</div>
           <div id="mistakeBlock" class="hidden">
             <div class="q" style="margin-top:6px;">間違えた問題の復習</div>
             <table>
-              <thead>
-                <tr><th>#</th><th>Hand</th><th>実際(%)</th><th>正解ボタン</th><th>あなたの回答</th></tr>
-              </thead>
+              <thead><tr><th>#</th><th>Pos</th><th>Hand</th><th>実際(%)</th><th>正解ボタン</th><th>あなた</th></tr></thead>
               <tbody id="mistakeTable"></tbody>
             </table>
-            <div class="controls">
-              <button id="startReviewBtn">復習を開始</button>
-            </div>
+            <div class="controls"><button id="startReviewBtn">復習を開始</button></div>
           </div>
-          <div class="controls">
-            <button id="restartBtn">もう一度 10問</button>
-          </div>
+          <div class="controls"><button id="restartBtn">もう一度 10問</button></div>
         </div>
       </div>
     </div>
   </div>
 
 <script>
-/* The rest (data, logic) is identical to the previous full version; to keep this message concise, it's omitted here. 
-   In the actual file, you'd include the entire JS like in the v2 full build.
-   For this environment, we'll quickly inject the same JS bundle as before. */
+/* ===== Hand utils ===== */
+const RANKS = ["A","K","Q","J","T","9","8","7","6","5","4","3","2"];
+function toHand(i,j){ if (i===j) return RANKS[i]+RANKS[j]; if (j>i) return RANKS[i]+RANKS[j]+"o"; return RANKS[j]+RANKS[i]+"s"; }
+function allHands169(){ const out=[]; for(let i=0;i<RANKS.length;i++){ for(let j=0;j<RANKS.length;j++){ out.push(toHand(i,j)); } } return out; }
 
-// --- JS bundle start (same as v2 full) ---
-const RANKS=["A","K","Q","J","T","9","8","7","6","5","4","3","2"];function toHand(e,n){return e===n?RANKS[e]+RANKS[n]:n>e?RANKS[e]+RANKS[n]+"o":RANKS[n]+RANKS[e]+"s"}function fromHand(e){if(2===e.length){const n=RANKS.indexOf(e[0]);return{i:n,j:n}}{const n=e[0],t=e[1],o=e[2],a=RANKS.indexOf(n),s=RANKS.indexOf(t);return"o"===o?{i:a,j:s}:{i:s,j:a}}}function allHands169(){const e=[];for(let n=0;n<RANKS.length;n++)for(let t=0;t<RANKS.length;t++)e.push(toHand(n,t));return e}const UTG=Object.fromEntries(allHands169().map((e=>[e,0]))),OPEN100=["AA","KK","QQ","JJ","TT","99","88","77","66","AKs","AQs","AJs","ATs","A9s","A8s","A7s","A6s","A5s","A4s","A3s","A2s","KQs","KJs","KTs","K9s","QJs","QTs","JTs","T9s","AKo","AQo","AJo","KQo"],OPEN75=["ATo","K8s","Q9s","KJo","J9s","55"],OPEN50=["98s","87s","76s","65s","44"];for(const e of OPEN100)UTG[e]=100;for(const e of OPEN75)UTG[e]=75;for(const e of OPEN50)UTG[e]=50;const DATA=Object.entries(UTG).map((([e,n])=>({Position:"UTG",Hand:e,Frequency:n}))),boundarySet=new Set([...OPEN75,...OPEN50]),nearBoundarySet=new Set;for(const e of boundarySet){const{ i:n,j:t }=fromHand(e);for(let e=-1;e<=1;e++)for(let o=-1;o<=1;o++){if(0===e&&0===o)continue;const a=n+e,s=t+o;(a<0||s<0||a>=RANKS.length||s>=RANKS.length)||nearBoundarySet.add(toHand(a,s))}}const CHOICES=[0,25,50,75,100],SUIT_SYMBOL={S:"♠",H:"♥",D:"♦",C:"♣"};function suitColorClass(e){return"H"===e||"D"===e?"red":"black"}function handToCards(e){if(2===e.length)return[e[0]+"S",e[1]+"H"];const n=e[0],t=e[1],o=e[2];return"s"===o?[n+"S",t+"S"]:[n+"S",t+"H"]}function rankText(e){return"T"===e?"10":e}function makeCardElement(e){const n=e[0],t=e[1],o=suitColorClass(t),a=document.createElement("div");a.className="card";const s=Object.assign(document.createElement("div"),{className:`rank ${o}`,textContent:rankText(n)}),r=Object.assign(document.createElement("div"),{className:`suit ${o}`,textContent:SUIT_SYMBOL[t]}),i=Object.assign(document.createElement("div"),{className:`rank bottom ${o}`,textContent:rankText(n)}),d=Object.assign(document.createElement("div"),{className:`suit bottom ${o}`,textContent:SUIT_SYMBOL[t]}),l=Object.assign(document.createElement("div"),{className:`pip ${o}`,textContent:SUIT_SYMBOL[t]});return a.append(s,r,l,i,d),a}function shuffle(e){for(let n=e.length-1;n>0;n--){const t=Math.floor(Math.random()*(n+1));[e[n],e[t]]=[e[t],e[n]]}return e}const QUIZ_LEN=10;let quizPool=[],usedHands=new Set;function buildQuizPool(){usedHands.clear();const e=DATA.filter((e=>boundarySet.has(e.Hand))),n=DATA.filter((n=>nearBoundarySet.has(n.Hand)&&!boundarySet.has(n.Hand))),t=DATA.filter((e=>0===e.Frequency&&nearBoundarySet.has(e.Hand))),o=DATA.filter((e=>0===e.Frequency&&!nearBoundarySet.has(e.Hand))),a=DATA.filter((e=>100===e.Frequency));function s(e,n){const t=[];for(let o=0;o<n;o++)t.push(...e);return t}const r=shuffle([...s(e,8),...s(n,5),...s(t,3),...s(o,1),...s(a,1)]),i=[];for(const e of r)if(!usedHands.has(e.Hand)&&(usedHands.add(e.Hand),i.push(e),i.length>=QUIZ_LEN))break;if(i.length<QUIZ_LEN){const e=shuffle(DATA.slice());for(const n of e)if(!usedHands.has(n.Hand)&&(usedHands.add(n.Hand),i.push(n),i.length>=QUIZ_LEN))break}quizPool=i}let questionIndex=0,score=0,current=null,history=[],inReview=!1;function nearestBucket(e){return CHOICES.reduce(((n,t)=>Math.abs(t-e)<Math.abs(n-e)?t:n),CHOICES[0])}function renderButtons(){document.getElementById("buttons").innerHTML=CHOICES.map((e=>`<button data-choice="${e}">${e}%</button>`)).join("")}renderButtons(),document.getElementById("buttons").addEventListener("click",(e=>{const n=e.target.closest("button[data-choice]");if(!n)return;const t=parseInt(n.dataset.choice,10);inReview?handleReviewAnswer(t):handleAnswer(t)})),document.getElementById("nextBtn").addEventListener("click",(()=>{inReview?onNextFromWrong_Review():onNextFromWrong_Quiz()})),document.getElementById("restartBtn").addEventListener("click",restartQuiz),document.getElementById("startReviewBtn").addEventListener("click",startReview);function newQuestion(){0===questionIndex&&buildQuizPool(),questionIndex>=QUIZ_LEN?endQuiz():(current=quizPool[questionIndex],document.getElementById("question").textContent=`UTG: ${current.Hand} はオープン何%？`,(()=>{const e=document.getElementById("hand-cards");e.innerHTML="",handToCards(current.Hand).forEach((n=>e.appendChild(makeCardElement(n))))})(),document.getElementById("result").textContent="",document.getElementById("nextBtn").classList.add("hidden"))}function handleAnswer(e){const n=nearestBucket(current.Frequency),t=e===n;history.push({hand:current.Hand,freq:current.Frequency,choice:e,nearest:n,correct:t});const o=0===current.Frequency?"フォールド":100===current.Frequency?"純オープン":"境界";document.getElementById("result").textContent=(t?"✅ 正解！":"❌ 不正解…")+` 正解:${n}%（実際:${current.Frequency}%）｜カテゴリ:${o}`;t?(score++,questionIndex++,updateProgress(),setTimeout(newQuestion,650)):document.getElementById("nextBtn").classList.remove("hidden")}function onNextFromWrong_Quiz(){questionIndex++,updateProgress(),newQuestion()}function updateProgress(){document.getElementById("progress").textContent=String(questionIndex),document.getElementById("score").textContent=String(score)}function endQuiz(){document.getElementById("quizPanel").classList.add("hidden"),document.getElementById("summaryPanel").classList.remove("hidden"),document.getElementById("summaryTitle").textContent="結果まとめ",document.getElementById("finalScore").textContent=String(score);const e=new Map;for(const n of history)n.correct||e.has(n.hand)||e.set(n.hand,n);const n=Array.from(e.values()),t=document.getElementById("mistakeTable");n.length?(document.getElementById("mistakeBlock").classList.remove("hidden"),t.innerHTML=n.map(((e,n)=>`<tr><td>${n+1}</td><td>${e.hand}</td><td>${e.freq}</td><td>${e.nearest}%</td><td>${e.choice}%</td></tr>`)).join(""),reviewQueue=n.map((e=>({Hand:e.hand,Frequency:e.freq})))):(document.getElementById("mistakeBlock").classList.add("hidden"),t.innerHTML="",reviewQueue=[])}function restartQuiz(){inReview=!1,questionIndex=0,score=0,history=[],document.getElementById("progress").textContent="0",document.getElementById("score").textContent="0",document.getElementById("result").textContent="",document.getElementById("summaryPanel").classList.add("hidden"),document.getElementById("quizPanel").classList.remove("hidden"),newQuestion()}let reviewQueue=[],reviewIndex=0,nextRoundQueue=[];function startReview(){reviewQueue.length&&(inReview=!0,reviewIndex=0,nextRoundQueue=[],reviewQueue=shuffle(reviewQueue.slice()),document.getElementById("quizPanel").classList.remove("hidden"),document.getElementById("summaryPanel").classList.add("hidden"),document.getElementById("progress").textContent="復習中",document.getElementById("score").textContent="-",nextReviewQuestion())}function nextReviewQuestion(){if(reviewIndex>=reviewQueue.length){return nextRoundQueue.length?(reviewQueue=shuffle(nextRoundQueue.slice()),nextRoundQueue=[],reviewIndex=0,void nextReviewQuestion()):(inReview=!1,document.getElementById("quizPanel").classList.add("hidden"),document.getElementById("summaryPanel").classList.remove("hidden"),document.getElementById("summaryTitle").innerHTML='結果まとめ　<span class="success">復習完了！</span>',void setTimeout((()=>{document.getElementById("summaryTitle").textContent="結果まとめ",restartQuiz()}),900))}current=reviewQueue[reviewIndex],document.getElementById("question").textContent=`[復習] UTG: ${current.Hand} は何%？`,(()=>{const e=document.getElementById("hand-cards");e.innerHTML="",handToCards(current.Hand).forEach((n=>e.appendChild(makeCardElement(n))))})(),document.getElementById("result").textContent="",document.getElementById("nextBtn").classList.add("hidden")}function handleReviewAnswer(e){const n=nearestBucket(current.Frequency),t=e===n;document.getElementById("result").textContent=t?"✅ 正解！":`❌ 正解は ${n}%（実際:${current.Frequency}%）`,t?setTimeout((()=>{reviewIndex++,nextReviewQuestion()}),600):(nextRoundQueue.push(current),document.getElementById("nextBtn").classList.remove("hidden"))}function onNextFromWrong_Review(){reviewIndex++,nextReviewQuestion()}newQuestion();
-// --- JS bundle end ---
+/* ===== UTG map (unchanged) ===== */
+const UTG = Object.fromEntries(allHands169().map(h=>[h,0]));
+const U_OPEN100 = ["AA","KK","QQ","JJ","TT","99","88","77","66","AKs","AQs","AJs","ATs","A9s","A8s","A7s","A6s","A5s","A4s","A3s","A2s","KQs","KJs","KTs","K9s","QJs","QTs","JTs","T9s","AKo","AQo","AJo","KQo"];
+const U_OPEN75  = ["ATo","K8s","Q9s","KJo","J9s","55"];
+const U_OPEN50  = ["98s","87s","76s","65s","44"];
+for (const h of U_OPEN100) UTG[h]=100;
+for (const h of U_OPEN75)  UTG[h]=75;
+for (const h of U_OPEN50)  UTG[h]=50;
+
+/* ===== HJ map (A2s+; 55+ fix) ===== */
+const HJ = Object.fromEntries(allHands169().map(h=>[h,0]));
+const ORDER = ["A","K","Q","J","T","9","8","7","6","5","4","3","2"];
+function setPairsAtLeast(lowRank){
+  const start = ORDER.indexOf(lowRank);
+  for (let idx=start; idx>=0; idx--){
+    const r = ORDER[idx];
+    HJ[r+r] = 100;
+  }
+}
+setPairsAtLeast("5"); // 55+
+
+// A2s+ (suited only)
+for (let i=ORDER.indexOf("2"); i>=1; i--){
+  const r = ORDER[i];
+  HJ["A"+r+"s"]=100;
+}
+HJ["AA"]=100;
+
+// K8s+
+for (const r of ["8","9","T","J","Q"]){ HJ["K"+r+"s"]=100; }
+HJ["AKs"]=100;
+
+// Q9s+
+for (const r of ["9","T","J"]){ HJ["Q"+r+"s"]=100; }
+HJ["KQs"]=100; HJ["AQs"]=100;
+
+// J9s
+HJ["J9s"]=100;
+
+// ATo+ (offsuit)
+for (const r of ["T","J","Q","K"]){ HJ["A"+r+"o"]=100; }
+
+// KJo+ (offsuit)
+HJ["KJo"]=100; HJ["KQo"]=100;
+
+// suited connectors 54s〜KQs
+const CONNECTORS=[["5","4"],["6","5"],["7","6"],["8","7"],["9","8"],["T","9"],["J","T"],["Q","J"],["K","Q"]];
+for (const [hi,lo] of CONNECTORS){ HJ[hi+lo+"s"]=100; }
+
+// 75%：QJo、K7s、T8s、43s、44、33
+HJ["QJo"]=75; HJ["K7s"]=75; HJ["T8s"]=75; HJ["43s"]=75; HJ["44"]=75; HJ["33"]=75;
+
+// Safety: explicitly ensure
+HJ["A8s"]=100; HJ["JJ"]=100;
+
+/* ===== Data assembly with Position ===== */
+function toData(map, pos){ return Object.entries(map).map(([Hand,Frequency])=>({Position:pos, Hand, Frequency})); }
+const DATA_UTG = toData(UTG, "UTG");
+const DATA_HJ  = toData(HJ,  "HJ");
+
+/* Boundary & neighbors per position */
+function boundarySetOf(map){ return new Set(Object.entries(map).filter(([,f])=>f===50||f===75).map(([h])=>h)); }
+const BOUNDARY_UTG = boundarySetOf(UTG);
+const BOUNDARY_HJ  = boundarySetOf(HJ);
+
+function fromHandOrder(hand){
+  if (hand.length===2){ const r = ORDER.indexOf(hand[0]); return {i:r,j:r}; }
+  const a=hand[0], b=hand[1], t=hand[2];
+  const ia=ORDER.indexOf(a), ib=ORDER.indexOf(b);
+  return t==="o" ? {i:ia,j:ib} : {i:ib,j:ia};
+}
+function toHandOrder(i,j){ if (i===j) return ORDER[i]+ORDER[i]; if (j>i) return ORDER[i]+ORDER[j]+"o"; return ORDER[j]+ORDER[i]+"s"; }
+function neighborsOf(handSet){
+  const out = new Set();
+  for (const h of handSet){
+    const {i,j} = fromHandOrder(h);
+    for (let di=-1; di<=1; di++){
+      for (let dj=-1; dj<=1; dj++){
+        if (di===0 && dj===0) continue;
+        const ni=i+di, nj=j+dj;
+        if (ni<0||nj<0||ni>=ORDER.length||nj>=ORDER.length) continue;
+        out.add(toHandOrder(ni,nj));
+      }
+    }
+  }
+  return out;
+}
+const NEAR_UTG = neighborsOf(BOUNDARY_UTG);
+const NEAR_HJ  = neighborsOf(BOUNDARY_HJ);
+
+/* ===== Weighted sampler per position ===== */
+function bucketsFor(pos){
+  const DATA = pos==="UTG" ? DATA_UTG : DATA_HJ;
+  const BOUND = pos==="UTG" ? BOUNDARY_UTG : BOUNDARY_HJ;
+  const NEAR  = pos==="UTG" ? NEAR_UTG : NEAR_HJ;
+  const boundary = DATA.filter(d=>BOUND.has(d.Hand));
+  const nearB    = DATA.filter(d=>NEAR.has(d.Hand) && !BOUND.has(d.Hand));
+  const foldsNear = DATA.filter(d=>d.Frequency===0 && NEAR.has(d.Hand));
+  const foldsOther= DATA.filter(d=>d.Frequency===0 && !NEAR.has(d.Hand));
+  const pure     = DATA.filter(d=>d.Frequency===100);
+  return {boundary, nearB, foldsNear, foldsOther, pure};
+}
+function repeat(arr, times){ const out=[]; for(let t=0;t<times;t++) out.push(...arr); return out; }
+function pickOne(pos){
+  const b = bucketsFor(pos);
+  const weighted = [
+    ...repeat(b.boundary, 8),
+    ...repeat(b.nearB, 5),
+    ...repeat(b.foldsNear, 3),
+    ...repeat(b.foldsOther, 1),
+    ...repeat(b.pure, 1),
+  ];
+  if (!weighted.length) return null;
+  return weighted[Math.floor(Math.random()*weighted.length)];
+}
+
+/* ===== Quiz (no duplicates by Position+Hand) ===== */
+const CHOICES = [0,25,50,75,100];
+const QUIZ_LEN = 10;
+let quizPool=[], usedSet=new Set();
+function buildQuizPool(){
+  quizPool=[]; usedSet.clear();
+  while (quizPool.length<QUIZ_LEN){
+    const pos = Math.random()<0.5 ? "UTG" : "HJ";
+    const cand = pickOne(pos);
+    if (!cand) continue;
+    const key = pos+"|"+cand.Hand;
+    if (usedSet.has(key)) continue;
+    usedSet.add(key);
+    quizPool.push(cand);
+  }
+}
+
+/* ===== WebAudio sound engine ===== */
+let audioCtx = null;
+function ensureAudio(){
+  if (!audioCtx){
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if (!AC) return false;
+    audioCtx = new AC();
+  }
+  if (audioCtx.state === "suspended"){ audioCtx.resume(); }
+  return true;
+}
+function beep({freq=880, duration=0.15, type="sine", gain=0.04}={}){
+  if (!ensureAudio()) return;
+  const osc = audioCtx.createOscillator();
+  const g = audioCtx.createGain();
+  osc.type = type;
+  osc.frequency.value = freq;
+  g.gain.value = 0;
+  osc.connect(g).connect(audioCtx.destination);
+  const t = audioCtx.currentTime;
+  g.gain.setValueAtTime(0, t);
+  g.gain.linearRampToValueAtTime(gain, t + 0.01);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + duration);
+  osc.start(t);
+  osc.stop(t + duration + 0.02);
+}
+function playCorrect(){ beep({freq:980, duration:0.12, type:"sine"}); setTimeout(()=>beep({freq:1318.5, duration:0.12, type:"sine"}), 110); }
+function playWrong(){ beep({freq:220, duration:0.15, type:"square"}); setTimeout(()=>beep({freq:180, duration:0.18, type:"square"}), 120); }
+document.addEventListener("click", ensureAudio, {once:true});
+document.getElementById("soundTestBtn").addEventListener("click", ()=>{ ensureAudio(); playCorrect(); });
+
+/* ===== Timing & Scoring ===== */
+let questionIndex=0, current=null, history=[], inReview=false;
+let startTime=0;
+let basePoints=0, bonusPoints=0; // 内訳
+function totalScore(){ return basePoints + bonusPoints; }
+const CHOICES_ORDER = [0,25,50,75,100];
+
+function suitColorClass(s){ return (s==="H"||s==="D") ? "red" : "black"; }
+const SUIT_SYMBOL = {S:"♠", H:"♥", D:"♦", C:"♣"};
+function handToCards(hand){
+  if (hand.length===2){ return [hand[0]+"S", hand[1]+"H"]; }
+  const r1 = hand[0], r2 = hand[1], type = hand[2];
+  if (type==="s"){ return [r1+"S", r2+"S"]; }
+  return [r1+"S", r2+"H"];
+}
+function rankText(r){ return r==="T" ? "10" : r; }
+function makeCardElement(code){
+  const r = code[0], s = code[1];
+  const colorCls = suitColorClass(s);
+  const el = document.createElement("div"); el.className = "card";
+  const rankTop = Object.assign(document.createElement("div"), {className:`rank ${colorCls}`, textContent: rankText(r)});
+  const suitTop = Object.assign(document.createElement("div"), {className:`suit ${colorCls}`, textContent: SUIT_SYMBOL[s]});
+  const rankBottom = Object.assign(document.createElement("div"), {className:`rank bottom ${colorCls}`, textContent: rankText(r)});
+  const suitBottom = Object.assign(document.createElement("div"), {className:`suit bottom ${colorCls}`, textContent: SUIT_SYMBOL[s]});
+  const pip = Object.assign(document.createElement("div"), {className:`pip ${colorCls}`, textContent: SUIT_SYMBOL[s]});
+  el.append(rankTop,suitTop,pip,rankBottom,suitBottom);
+  return el;
+}
+function shuffle(arr){ for(let i=arr.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [arr[i],arr[j]]=[arr[j],arr[i]]; } return arr; }
+function nearestBucket(freq){ return CHOICES.reduce((p,c)=> Math.abs(c-freq) < Math.abs(p-freq) ? c : p, CHOICES[0]); }
+function setActiveSeat(pos){
+  document.getElementById("seatUTG").classList.toggle("active", pos==="UTG");
+  document.getElementById("seatHJ").classList.toggle("active", pos==="HJ");
+}
+
+function renderButtons(){
+  const cont = document.getElementById("buttons");
+  cont.innerHTML = CHOICES_ORDER.map(c=>`<button data-choice="${c}">${c}%</button>`).join("");
+}
+renderButtons();
+
+document.getElementById("buttons").addEventListener("click",(e)=>{
+  const btn = e.target.closest("button[data-choice]"); if(!btn) return;
+  ensureAudio();
+  const choice = parseInt(btn.dataset.choice,10);
+  if (inReview) handleReviewAnswer(choice); else handleAnswer(choice);
+});
+document.getElementById("nextBtn").addEventListener("click",()=>{
+  ensureAudio();
+  if (inReview) onNextFromWrong_Review(); else onNextFromWrong_Quiz();
+});
+document.getElementById("restartBtn").addEventListener("click", ()=>{ ensureAudio(); restartQuiz(); });
+document.getElementById("startReviewBtn").addEventListener("click", ()=>{ ensureAudio(); startReview(); });
+
+function newQuestion(){
+  if (questionIndex === 0){ buildQuizPool(); }
+  if (questionIndex >= QUIZ_LEN){ return endQuiz(); }
+  current = quizPool[questionIndex];
+  setActiveSeat(current.Position);
+  document.getElementById("question").textContent = `${current.Position}: ${current.Hand} はオープン何%？`;
+  const container = document.getElementById("hand-cards");
+  container.innerHTML="";
+  handToCards(current.Hand).forEach(c => container.appendChild(makeCardElement(c)));
+  document.getElementById("result").textContent="";
+  document.getElementById("nextBtn").classList.add("hidden");
+  startTime = performance.now();
+}
+function handleAnswer(choice){
+  const nearest = nearestBucket(current.Frequency);
+  const correct = (choice === nearest);
+  const elapsedSec = (performance.now() - startTime)/1000;
+  const cat = (current.Frequency===0) ? "フォールド" : (current.Frequency===100 ? "純オープン" : "境界");
+  if (correct){
+    const bonus = elapsedSec <= 3 ? 3 : (elapsedSec <= 5 ? 1 : 0);
+    basePoints += 1;
+    bonusPoints += bonus;
+    document.getElementById("score").textContent = String(totalScore());
+    document.getElementById("result").textContent = `✅ 正解！ 正解:${nearest}%（実際:${current.Frequency}%）｜${current.Position}｜カテゴリ:${cat} ｜ 経過 ${elapsedSec.toFixed(2)} 秒 ／ ボーナス +${bonus}`;
+    playCorrect();
+    questionIndex++; updateProgress(); setTimeout(newQuestion, 800);
+  } else {
+    document.getElementById("result").textContent = `❌ 不正解… 正解:${nearest}%（実際:${current.Frequency}%）｜${current.Position}｜カテゴリ:${cat}`;
+    playWrong();
+    document.getElementById("nextBtn").classList.remove("hidden");
+  }
+  history.push({pos: current.Position, hand: current.Hand, freq: current.Frequency, choice, nearest, correct, elapsedSec});
+}
+function onNextFromWrong_Quiz(){ questionIndex++; updateProgress(); newQuestion(); }
+function updateProgress(){ document.getElementById("progress").textContent = String(questionIndex); }
+
+function endQuiz(){
+  document.getElementById("quizPanel").classList.add("hidden");
+  document.getElementById("summaryPanel").classList.remove("hidden");
+  document.getElementById("finalBreakdown").textContent = `最終スコア: ${basePoints}点 + ボーナス${bonusPoints}点`;
+
+  const dedup = new Map();
+  for (const h of history){ if (!h.correct){ const key = h.pos+"|"+h.hand; if (!dedup.has(key)) dedup.set(key, h); } }
+  const mistakes = Array.from(dedup.values());
+  const tbody = document.getElementById("mistakeTable");
+  if (mistakes.length){
+    document.getElementById("mistakeBlock").classList.remove("hidden");
+    tbody.innerHTML = mistakes.map((m,i)=>`<tr>
+      <td>${i+1}</td><td>${m.pos}</td><td>${m.hand}</td><td>${m.freq}</td><td>${m.nearest}%</td><td>${m.choice}%</td>
+    </tr>`).join("");
+    reviewQueue = mistakes.map(m => ({Position:m.pos, Hand:m.hand, Frequency:m.freq}));
+  } else {
+    document.getElementById("mistakeBlock").classList.add("hidden");
+    tbody.innerHTML = ""; reviewQueue = [];
+  }
+}
+
+function restartQuiz(){
+  inReview = false; questionIndex = 0; basePoints = 0; bonusPoints = 0; history = [];
+  document.getElementById("progress").textContent = "0";
+  document.getElementById("score").textContent = "0";
+  document.getElementById("result").textContent = "";
+  document.getElementById("summaryPanel").classList.add("hidden");
+  document.getElementById("quizPanel").classList.remove("hidden");
+  newQuestion();
+}
+
+/* Review loop (no scoring; no auto-next after completion) */
+let reviewQueue = [], reviewIndex = 0, nextRoundQueue = [];
+function startReview(){
+  if (!reviewQueue.length) return;
+  inReview = true;
+  reviewIndex = 0; nextRoundQueue = [];
+  reviewQueue = shuffle(reviewQueue.slice());
+  document.getElementById("quizPanel").classList.remove("hidden");
+  document.getElementById("summaryPanel").classList.add("hidden");
+  document.getElementById("progress").textContent = "復習中";
+  document.getElementById("score").textContent = String(totalScore());
+  nextReviewQuestion();
+}
+function nextReviewQuestion(){
+  if (reviewIndex >= reviewQueue.length){
+    if (nextRoundQueue.length){
+      reviewQueue = shuffle(nextRoundQueue.slice()); nextRoundQueue = []; reviewIndex = 0; nextReviewQuestion();
+    } else {
+      inReview = false;
+      document.getElementById("quizPanel").classList.add("hidden");
+      document.getElementById("summaryPanel").classList.remove("hidden");
+      document.getElementById("summaryTitle").innerHTML = '結果まとめ　<span class="success">復習完了！</span>';
+      // no auto restart
+    }
+    return;
+  }
+  current = reviewQueue[reviewIndex];
+  setActiveSeat(current.Position);
+  document.getElementById("question").textContent = `[復習] ${current.Position}: ${current.Hand} は何%？`;
+  const container = document.getElementById("hand-cards");
+  container.innerHTML="";
+  handToCards(current.Hand).forEach(c => container.appendChild(makeCardElement(c)));
+  document.getElementById("result").textContent="";
+  document.getElementById("nextBtn").classList.add("hidden");
+  startTime = performance.now();
+}
+function handleReviewAnswer(choice){
+  const nearest = nearestBucket(current.Frequency);
+  const correct = (choice === nearest);
+  if (correct){
+    playCorrect();
+    document.getElementById("result").textContent = "✅ 正解！";
+    setTimeout(()=>{ reviewIndex++; nextReviewQuestion(); }, 700);
+  } else {
+    playWrong();
+    document.getElementById("result").textContent = `❌ 正解は ${nearest}%（実際:${current.Frequency}%）`;
+    nextRoundQueue.push(current);
+    document.getElementById("nextBtn").classList.remove("hidden");
+  }
+}
+function onNextFromWrong_Review(){ reviewIndex++; nextReviewQuestion(); }
+
+// Debug pairs (seen in console)
+console.log("HJ pairs 55+ status:", ["55","66","77","88","99","TT","JJ","QQ","KK","AA"].map(p=>p+":"+HJ[p]));
+
+// Init
+quizPool = [];
+usedSet = new Set();
+newQuestion();
 </script>
 </body>
 </html>
