@@ -109,6 +109,119 @@
   .cell{position:relative; background:#181818; border:1px solid var(--cell-bd); aspect-ratio:1/1; min-width:24px;
         display:flex; align-items:center; justify-content:center; font-size: clamp(9px, 1.9vw, 12px); color:var(--label);}
   .fill{position:absolute; left:0; top:0; bottom:0; width:0%; background:var(--fill); opacity:.9}
+
+  .deal-overlay{position:absolute; left:0; top:0; right:0; bottom:0; pointer-events:none; z-index:3;}
+  .cards.on-table{position:absolute; display:flex; gap:6px; justify-content:center; align-items:center;}
+  .cards.on-table .card{width:66px; height:96px;}
+  @media (orientation: landscape){
+    .cards.on-table .card{width:70px; height:102px;}
+  }
+
+
+  .table { position: relative; width: 100%; max-width: 480px; margin: auto; }
+  .cards.on-table .card {
+    height: 16.6%; /* 1/6 of table height */
+    width: auto;   /* keep aspect ratio */
+  }
+
+
+  /* --- on-table cards sizing & layout fix --- */
+  .deal-overlay{position:absolute; inset:0; pointer-events:none; z-index:3;}
+  .cards.on-table{position:absolute; height:100%; width:100%; display:flex; gap:8px; align-items:center; justify-content:center;}
+  .cards.on-table .card{
+    height: 16.666%; /* 1/6 of table height */
+    width: auto;
+    aspect-ratio: 78 / 112; /* keep original card ratio */
+    border: 1px solid var(--card-outline);
+    background: var(--card-bg);
+  }
+
+
+  /* --- fine-tune on-table card typography & size --- */
+  .cards.on-table .card{
+    height: 20%; /* 1/5 of table height per request */
+  }
+  .cards.on-table .card .rank{ font-size:12px; left:4px; top:2px; }
+  .cards.on-table .card .suit{ font-size:12px; left:4px; top:16px; }
+  .cards.on-table .card .rank.bottom{ right:4px; bottom:2px; }
+  .cards.on-table .card .suit.bottom{ right:4px; bottom:16px; }
+  .cards.on-table .card .pip{ font-size:20px; }
+
+
+  /* --- avoid overlap of corner suits and center pip on small cards --- */
+  .cards.on-table .card .rank{ font-size:12px; left:3px; top:2px; }
+  .cards.on-table .card .suit{ font-size:11px; left:3px; top:14px; }
+  .cards.on-table .card .rank.bottom{ right:3px; bottom:2px; }
+  .cards.on-table .card .suit.bottom{ right:3px; bottom:14px; }
+  .cards.on-table .card .pip{ font-size:16px; } /* a little smaller to avoid touching corners */
+
+
+  /* --- on-table: show only central pip (hide corners) --- */
+  .cards.on-table .card .rank,
+  .cards.on-table .card .suit { display: none; }
+  .cards.on-table .card .pip { font-size:18px; }
+
+
+  /* --- on-table cards: show left-top rank+suit + big center pip; hide bottom corner --- */
+  .cards.on-table .card .rank,
+  .cards.on-table .card .suit { display:block; }
+  .cards.on-table .card .rank.bottom,
+  .cards.on-table .card .suit.bottom { display:none; }
+  .cards.on-table .card .rank{ font-size:14px; left:4px; top:2px; }
+  .cards.on-table .card .suit{ font-size:14px; left:4px; top:18px; }
+  .cards.on-table .card .pip{ font-size:24px; }
+
+
+  /* --- on-table cards: ranks only at corners, suit only at center --- */
+  .cards.on-table .card .suit { display:none; }                  /* hide corner suits */
+  .cards.on-table .card .rank { display:block; font-size:14px; } /* show ranks */
+  .cards.on-table .card .rank { left:4px; top:2px; }             /* top-left position */
+  .cards.on-table .card .rank.bottom { display:block; right:4px; bottom:2px; } /* bottom-right rank */
+  .cards.on-table .card .pip { font-size:18px; }                 /* big center suit */
+
+
+  /* --- adjust font sizes for ranks and pip --- */
+  .cards.on-table .card .rank { font-size:12px; }
+  .cards.on-table .card .pip { font-size:18px; }
+
+
+  /* --- adjust central suit font size --- */
+  .cards.on-table .card .pip { font-size:18px; }
+
+
+  /* --- Landscape layout: 1:1 split, table on the left --- */
+  @media (orientation: landscape){
+    .row{ flex-direction: row; align-items: stretch; }
+    .leftCol, .rightCol{ flex: 1 1 50%; min-width:0; }
+    .table-wrap{ justify-content: flex-end; padding-right: 8px; }
+    .rightCol{ display:flex; flex-direction:column; }
+    .rightCol .panel{ flex:1 1 auto; }
+    /* make table large enough but within viewport */
+    .table{ width: min(45vw, 520px); height: calc(min(45vw, 520px) * 0.6); }
+    /* ensure on-table cards scale with the new table size */
+    .cards.on-table .card{ height: 20%; }
+  }
+
+
+  /* --- Right column scrolling behavior in landscape --- */
+  @media (orientation: landscape){
+    .rightCol{ overflow:auto; gap:8px; }
+    .rightCol > .panel, .rightCol > .viewer{ margin-bottom: 8px; }
+  }
+
+
+  /* --- Portrait: make choice buttons larger while fitting 5 per row --- */
+  @media (orientation: portrait){
+    .choices{ grid-template-columns: repeat(5, 1fr); gap: 8px; }
+    .choices button{
+      font-size: 18px;
+      padding: 14px 0;
+      min-height: 56px;
+      border-radius: 12px;
+      touch-action: manipulation;
+    }
+  }
+
 </style>
 </head>
 <body>
@@ -118,6 +231,9 @@
       <div class="col leftCol">
         <div class="table-wrap">
           <div class="table" aria-label="Poker Table">
+            <div id="dealOverlay" class="deal-overlay hidden">
+              <div id="hand-cards" class="cards on-table"></div>
+            </div>
             <div class="coin bb-coin1" aria-hidden="true"></div>
             <div class="coin bb-coin2" aria-hidden="true"></div>
             <div class="coin sb-coin1" aria-hidden="true"></div>
@@ -174,8 +290,7 @@
             <p id="question" class="q"></p>
             <button id="quitBtn" class="btn-danger">やめる</button>
           </div>
-          <div class="meta">出題モード: <span id="modeTag" class="tag">境界＋近傍優先</span>（境界≫近傍≫フォールド＞純オープン）</div>
-          <div id="hand-cards" class="cards"></div>
+          
           <div class="controls"><div class="choices" id="buttons"></div></div>
           <div class="result" id="result"></div>
           <div class="sticky-next"><button id="nextBtn" class="hidden">次の問題へ</button></div>
@@ -201,6 +316,69 @@
 
 <script>
 /* ===== show/hide utils (robust) ===== */
+
+/* ===== Responsive panel placement (portrait vs landscape) ===== */
+function movePanelsForOrientation(){
+  const isLandscape = window.matchMedia("(orientation: landscape)").matches;
+  const leftCol = document.querySelector(".leftCol");
+  const rightCol = document.querySelector(".rightCol");
+  const start = document.getElementById("startPanel");
+  const viewer = document.getElementById("viewerPanel");
+  const quiz = document.getElementById("quizPanel");
+  const summary = document.getElementById("summaryPanel");
+
+  if (!leftCol || !rightCol) return;
+  if (isLandscape){
+    // Put start & viewer on the RIGHT side (above quiz/summary)
+    if (start && start.parentElement !== rightCol){
+      rightCol.insertBefore(start, rightCol.firstChild);
+    }
+    if (viewer && viewer.parentElement !== rightCol){
+      rightCol.insertBefore(viewer, quiz ? quiz : rightCol.firstChild);
+    }
+  } else {
+    // Portrait: table (leftCol) above, then start/viewer under the table as before
+    const tableWrap = document.querySelector(".table-wrap");
+    if (start && start.parentElement !== leftCol){
+      leftCol.appendChild(start);
+    }
+    if (viewer && viewer.parentElement !== leftCol){
+      leftCol.appendChild(viewer);
+    }
+  }
+}
+// Run on load and on orientation change / resize
+window.addEventListener("load", movePanelsForOrientation);
+window.addEventListener("resize", movePanelsForOrientation);
+window.addEventListener("orientationchange", movePanelsForOrientation);
+
+
+
+
+
+/* ===== card overlay positioning near seats ===== */
+const overlay = document.getElementById("dealOverlay");
+const onTableCards = document.getElementById("hand-cards");
+function placeCardsNear(pos){
+  // coordinates (%) inside .table, anchor is center of the two cards
+  const anchorMap = {
+    UTG: {top:"24%", left:"50%", transform:"translate(-50%, -50%)"},  // moved slightly downward
+    HJ:  {top:"36%", left:"68%", transform:"translate(-50%, -50%)"},
+    CO:  {top:"64%", left:"68%", transform:"translate(-50%, -50%)"},
+    BTN: {top:"76%", left:"50%", transform:"translate(-50%, -50%)"},  // moved slightly upward
+  };
+  const a = anchorMap[pos] || {top:"50%", left:"50%", transform:"translate(-50%,-50%)"};
+  onTableCards.style.top = a.top;
+  onTableCards.style.left = a.left;
+  onTableCards.style.transform = a.transform;
+  overlay.classList.remove("hidden");
+}
+function hideCardsOnTable(){ overlay.classList.add("hidden"); onTableCards.innerHTML=""; }
+
+
+
+
+
 function hide(el){ if(!el) return; el.classList.add('hidden'); el.style.display='none'; el.setAttribute('aria-hidden','true'); }
 function show(el){ if(!el) return; el.classList.remove('hidden'); el.style.display='block'; el.setAttribute('aria-hidden','false'); }
 
@@ -477,7 +655,7 @@ document.addEventListener("click", ensureAudio, {once:true});
 
 /* interactions */
 const viewerPanel = document.getElementById("viewerPanel");
-document.getElementById("startBtn").addEventListener("click", ()=>{
+document.getElementById("startBtn").addEventListener("click", ()=>{ hideCardsOnTable();
   ensureAudio();
   hide(viewerPanel); // hide viewer on start
   document.getElementById("startPanel").classList.add("hidden");
@@ -529,7 +707,7 @@ document.getElementById("restartBtn").addEventListener("click", ()=>{
   quitToStart();
 });
 document.getElementById("startReviewBtn").addEventListener("click", ()=>{ ensureAudio(); startReview(); });
-document.getElementById("openViewerBtn").addEventListener("click", ()=>{
+document.getElementById("openViewerBtn").addEventListener("click", ()=>{ hideCardsOnTable();
   show(viewerPanel);
   renderGrid("UTG");
 });
@@ -564,6 +742,7 @@ function quitToStart(){
   document.getElementById("score").textContent="0";
   document.getElementById("progress").textContent="0";
   document.getElementById("result").textContent="";
+  hideCardsOnTable();
   updateStartButton();
 }
 
@@ -590,9 +769,9 @@ function newQuestion(){
   show(document.getElementById("quizPanel"));
   setActiveSeat(current.Position);
   document.getElementById("question").textContent = `${current.Position}: ${current.Hand} のオープン頻度は何%？`;
-  const container = document.getElementById("hand-cards");
-  container.innerHTML="";
-  handToCards(current.Hand).forEach(c => container.appendChild(makeCardElement(c)));
+  onTableCards.innerHTML="";
+  handToCards(current.Hand).forEach(c => onTableCards.appendChild(makeCardElement(c)));
+  placeCardsNear(current.Position);
   document.getElementById("result").textContent="";
   document.getElementById("nextBtn").classList.add("hidden");
   startTime = performance.now();
@@ -623,6 +802,7 @@ function onNextFromWrong_Quiz(){ questionIndex++; updateProgress(); newQuestion(
 function endQuiz(){
   document.getElementById("quizPanel").classList.add("hidden");
   document.getElementById("summaryPanel").classList.remove("hidden");
+  hideCardsOnTable();
   document.getElementById("finalBreakdown").textContent = `最終スコア: ${basePoints}点 + ボーナス${bonusPoints}点`;
 
   const dedup = new Map();
@@ -669,9 +849,9 @@ function nextReviewQuestion(){
   current = reviewQueue[reviewIndex];
   setActiveSeat(current.Position);
   document.getElementById("question").textContent = `[復習] ${current.Position}: ${current.Hand} は何%？`;
-  const container = document.getElementById("hand-cards");
-  container.innerHTML="";
-  handToCards(current.Hand).forEach(c => container.appendChild(makeCardElement(c)));
+  onTableCards.innerHTML="";
+  handToCards(current.Hand).forEach(c => onTableCards.appendChild(makeCardElement(c)));
+  placeCardsNear(current.Position);
   document.getElementById("result").textContent="";
   document.getElementById("nextBtn").classList.add("hidden");
   startTime = performance.now();
