@@ -655,6 +655,7 @@ function buildQuizPool(){
 }
 
 /* end & review */
+
 function endQuiz(){
   const quiz = document.getElementById("quizPanel");
   const summary = document.getElementById("summaryPanel");
@@ -664,7 +665,7 @@ function endQuiz(){
   if (quiz) quiz.classList.add("hidden");
   if (viewer) hide(viewer);
   if (startP) hide(startP);
-  show(summary); // robust: ensure visible even if class state broken
+  show(summary);
   document.getElementById("finalBreakdown").textContent = `最終スコア: ${basePoints}点 + ボーナス${bonusPoints}点`;
 
   const dedup = new Map();
@@ -682,27 +683,12 @@ function endQuiz(){
     tbody.innerHTML = ""; reviewQueue = [];
   }
 
-  // Ensure panel is scrolled into view in the right column
   try {
     const rightCol = document.querySelector('.rightCol');
     if (rightCol) { rightCol.scrollTop = 0; }
-    summary.scrollIntoView({behavior:'instant', block:'start'});
+    summary.scrollIntoView({behavior:'auto', block:'start'});
   } catch {}
-} }
-  const mistakes = Array.from(dedup.values());
-  const tbody = document.getElementById("mistakeTable");
-  if (mistakes.length){
-    document.getElementById("mistakeBlock").classList.remove("hidden");
-    tbody.innerHTML = mistakes.map((m,i)=>`<tr>
-      <td>${i+1}</td><td>${m.pos}</td><td>${m.hand}</td><td>${m.freq}</td><td>${m.nearest}%</td><td>${m.choice}%</td>
-    </tr>`).join("");
-    reviewQueue = mistakes.map(m => ({Position:m.pos, Hand:m.hand, Frequency:m.freq}));
-  } else {
-    document.getElementById("mistakeBlock").classList.add("hidden");
-    tbody.innerHTML = ""; reviewQueue = [];
-  }
 }
-
 /* review */
 let reviewQueue = [], reviewIndex = 0, nextRoundQueue = [];
 function startReview(){
