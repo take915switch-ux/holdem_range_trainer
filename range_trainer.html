@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>solver plusレンジ記憶トレーニング（6-max｜UTG/HJ/CO/BTN=2.5bb・SB=3bb｜v4.10.0）</title>
+<title>solver plusレンジ記憶トレーニング（6-max｜UTG/HJ/CO/BTN=2.5bb・SB=3bb）</title>
 <style>
   :root {
     --table-green: #116b3b; --felt: #0c7a43; --seat:#444; --seat-text:#fff; --active:#e53935;
@@ -72,7 +72,7 @@
   .meta{font-size:12px;opacity:.9;text-align:center}
   .tag{display:inline-block;padding:2px 6px;border-radius:8px;background:#2a2a2a;margin-left:6px;font-size:12px}
 
-  /* Portrait: make choice buttons larger while fitting 5 per row */
+  /* Portrait: big buttons */
   @media (orientation: portrait){
     .choices{ grid-template-columns: repeat(5, 1fr); gap: 8px; }
     .choices button{
@@ -83,7 +83,6 @@
       touch-action: manipulation;
     }
   }
-
   /* Landscape layout: 1:1 split, table on the left */
   @media (orientation: landscape){
     .row{ flex-direction: row; align-items: stretch; }
@@ -108,7 +107,6 @@
   .cards.on-table .card .rank{ font-size:12px; left:4px; top:2px; }
   .cards.on-table .card .rank.bottom{ right:4px; bottom:2px; }
   .cards.on-table .card .pip{ font-size:18px; }
-  /* hide corner suits on table cards (we show only ranks at corners) */
   .cards.on-table .card .suit{ display:none; }
 
   /* Range Viewer */
@@ -128,7 +126,7 @@
 </style>
 </head>
 <body>
-  <h1>solver plusレンジ記憶トレーニング（6-max｜UTG/HJ/CO/BTN=2.5bb・SB=3bb｜v4.10.0）</h1>
+  <h1>solver plusレンジ記憶トレーニング（6-max｜UTG/HJ/CO/BTN=2.5bb・SB=3bb）</h1>
   <div class="app">
     <div class="row">
       <div class="col leftCol">
@@ -145,7 +143,6 @@
             <div class="seat s5" id="seatSB" data-pos="SB">SB</div>
             <div class="seat s6" id="seatBB" data-pos="BB">BB</div>
 
-            <!-- overlay for cards -->
             <div id="dealOverlay" class="deal-overlay hidden">
               <div id="hand-cards" class="cards on-table"></div>
             </div>
@@ -159,7 +156,6 @@
           </div>
         </div>
 
-        <!-- Range Viewer Panel -->
         <div class="viewer hidden" id="viewerPanel" aria-hidden="true" style="display:none">
           <div class="viewer-header">
             <div class="tabbar">
@@ -178,7 +174,6 @@
             <div class="box"><div class="fill" style="width:100%"></div></div><div>100%</div>
             <div class="box"><div class="fill" style="width:75%"></div></div><div>75%</div>
             <div class="box"><div class="fill" style="width:50%"></div></div><div>50%</div>
-            <div>（赤バーは<strong>左から</strong>割合分を塗ります。左上AA／右上A2s／左下A2o／右下22）</div>
           </div>
           <div class="grid-wrap">
             <div class="grid" id="rangeGrid"></div>
@@ -216,7 +211,21 @@
   </div>
 
 <script>
-/* ===== Responsive panel placement (portrait vs landscape) ===== */
+
+// === Legend box size sync to grid cell size ===
+function updateLegendBoxSize(){
+  try{
+    const grid = document.getElementById('rangeGrid');
+    const firstCell = grid ? grid.querySelector('.cell') : null;
+    if(!firstCell) return;
+    const w = firstCell.getBoundingClientRect().width;
+    document.querySelectorAll('.legend .box').forEach(box => {
+      box.style.width = w + 'px';
+      box.style.height = w + 'px';
+    });
+  }catch(e){}
+}
+
 function movePanelsForOrientation(){
   const isLandscape = window.matchMedia("(orientation: landscape)").matches;
   const leftCol = document.querySelector(".leftCol");
@@ -235,32 +244,28 @@ function movePanelsForOrientation(){
   }
 }
 window.addEventListener("load", movePanelsForOrientation);
-window.addEventListener("resize", movePanelsForOrientation);
-window.addEventListener("orientationchange", movePanelsForOrientation);
+window.addEventListener("resize", ()=>{ movePanelsForOrientation(); updateLegendBoxSize(); });
+window.addEventListener("orientationchange", ()=>{ movePanelsForOrientation(); updateLegendBoxSize(); });
 
-/* ===== show/hide utils ===== */
 function hide(el){ if(!el) return; el.classList.add('hidden'); el.style.display='none'; el.setAttribute('aria-hidden','true'); }
 function show(el){ if(!el) return; el.classList.remove('hidden'); el.style.display='block'; el.setAttribute('aria-hidden','false'); }
 
-/* ===== Hand utils ===== */
 const RANKS = ["A","K","Q","J","T","9","8","7","6","5","4","3","2"];
 function toHandGrid(i,j){
   if (i===j) return RANKS[i]+RANKS[j];
-  if (i < j) return RANKS[i]+RANKS[j]+"s"; // top-right suited (A2s)
-  return RANKS[j]+RANKS[i]+"o";           // bottom-left offsuit (A2o)
+  if (i < j) return RANKS[i]+RANKS[j]+"s";
+  return RANKS[j]+RANKS[i]+"o";
 }
 function allHands169(){ const out=[]; for(let i=0;i<RANKS.length;i++){ for(let j=0;j<RANKS.length;j++){ out.push(toHandGrid(i,j)); } } return out; }
 const ORDER = ["A","K","Q","J","T","9","8","7","6","5","4","3","2"];
-function shuffle(arr){ for(let i=arr.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [arr[i],arr[j]]=[arr[j],arr[i]]; } return arr; }
+function shuffle(arr){ for(let i=arr.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [arr[i],arr[j]]=[arr[j]]; } return arr; }
 
-/* ===== position maps ===== */
 const UTG = Object.fromEntries(allHands169().map(h=>[h,0]));
 const HJ  = Object.fromEntries(allHands169().map(h=>[h,0]));
 const CO  = Object.fromEntries(allHands169().map(h=>[h,0]));
 const BTN = Object.fromEntries(allHands169().map(h=>[h,0]));
 const SB  = Object.fromEntries(allHands169().map(h=>[h,0]));
 
-/* helpers */
 function setPairsAtLeast(map, lowRank){
   const start = ORDER.indexOf(lowRank);
   for (let idx=start; idx>=0; idx--){
@@ -274,7 +279,6 @@ function addLeftFixedPlus(map, left, right, type){
   const h1 = left + right + type; map[h1]=100;
   if (idx-1 >= 0){ const next = ORDER[idx-1]; const h2 = left + next + type; map[h2]=100; }
 }
-/* SB plus helpers */
 function addSuitedPlus2(map, left, minRight){
   const li = ORDER.indexOf(left);
   const start = ORDER.indexOf(minRight);
@@ -291,7 +295,7 @@ function addOffsuitPlus(map, left, minRight){
     map[left + r + "o"] = 100;
   }
 }
-function addRunLeftFixedPlus(map, left, minRight){ // e.g., 96s+ => 96s,97s,98s
+function addRunLeftFixedPlus(map, left, minRight){
   const li = ORDER.indexOf(left);
   for (let j = ORDER.indexOf(minRight); j > li; j--){
     const r = ORDER[j];
@@ -299,12 +303,10 @@ function addRunLeftFixedPlus(map, left, minRight){ // e.g., 96s+ => 96s,97s,98s
   }
 }
 
-/* ===== UTG data ===== */
 for (const h of ["AA","KK","QQ","JJ","TT","99","88","77","66","AKs","AQs","AJs","ATs","A9s","A8s","A7s","A6s","A5s","A4s","A3s","A2s","KQs","KJs","KTs","K9s","QJs","QTs","JTs","T9s","AKo","AQo","AJo","KQo"]) UTG[h]=100;
 for (const h of ["ATo","K8s","Q9s","KJo","J9s","55"]) UTG[h]=75;
 for (const h of ["98s","87s","76s","65s","44"]) UTG[h]=50;
 
-/* ===== HJ data ===== */
 setPairsAtLeast(HJ,"5");
 for (let i=ORDER.indexOf("2"); i>=1; i--){ const r=ORDER[i]; HJ["A"+r+"s"]=100; }
 HJ["AA"]=100;
@@ -317,46 +319,38 @@ for (const [hi,lo] of [["5","4"],["6","5"],["7","6"],["8","7"],["9","8"],["T","9
 for (const h of ["QJo","K7s","T8s","43s","44","33"]) HJ[h]=75;
 HJ["A8s"]=100; HJ["JJ"]=100;
 
-/* ===== CO data (with corrections) ===== */
-setPairsAtLeast(CO,"2"); // 22+
-for (let i=ORDER.indexOf("2"); i>=1; i--){ const r=ORDER[i]; CO["A"+r+"s"]=100; } // A2s+
-for (const r of ["4","5","6","7","8","9","T","J","Q"]){ CO["K"+r+"s"]=100; } // K4s+
-for (const r of ["7","8","9","T","J"]){ CO["Q"+r+"s"]=100; } // Q7s+
+setPairsAtLeast(CO,"2");
+for (let i=ORDER.indexOf("2"); i>=1; i--){ const r=ORDER[i]; CO["A"+r+"s"]=100; }
+for (const r of ["4","5","6","7","8","9","T","J","Q"]){ CO["K"+r+"s"]=100; }
+for (const r of ["7","8","9","T","J"]){ CO["Q"+r+"s"]=100; }
 CO["J7s"]=100; CO["T7s"]=100;
-addLeftFixedPlus(CO, "9", "7", "s"); // 97s, 98s
-addLeftFixedPlus(CO, "8", "6", "s"); // 86s, 87s
+addLeftFixedPlus(CO, "9", "7", "s");
+addLeftFixedPlus(CO, "8", "6", "s");
 for (const [hi,lo] of [["5","4"],["6","5"],["7","6"],["8","7"],["9","8"],["T","9"],["J","T"],["Q","J"],["K","Q"]]) CO[hi+lo+"s"]=100;
 for (const r of ["8","9","T","J","Q","K"]){ CO["A"+r+"o"]=100; }
 for (const h of ["KTo","KJo","KQo","QTo","JTo"]) CO[h]=100;
 for (const h of ["A7o","K3s","Q6s","43s"]) CO[h]=75;
-// Corrections
 CO["QJo"]=100; CO["J9s"]=100; CO["J8s"]=100; CO["T8s"]=100;
 
-/* ===== BTN data (with corrections) ===== */
-setPairsAtLeast(BTN,"2"); // 22+
-for (let i=ORDER.indexOf("2"); i>=1; i--){ const r=ORDER[i]; BTN["A"+r+"s"]=100; } // A2s+
-for (let i=ORDER.indexOf("2"); i>=1; i--){ const r=ORDER[i]; BTN["K"+r+"s"]=100; } // K2s+
-for (let i=ORDER.indexOf("3"); i>=1; i--){ const r=ORDER[i]; BTN["Q"+r+"s"]=100; } // Q3s+
+setPairsAtLeast(BTN,"2");
+for (let i=ORDER.indexOf("2"); i>=1; i--){ const r=ORDER[i]; BTN["A"+r+"s"]=100; }
+for (let i=ORDER.indexOf("2"); i>=1; i--){ const r=ORDER[i]; BTN["K"+r+"s"]=100; }
+for (let i=ORDER.indexOf("3"); i>=1; i--){ const r=ORDER[i]; BTN["Q"+r+"s"]=100; }
 BTN["J5s"]=100; BTN["T6s"]=100;
-addLeftFixedPlus(BTN, "9", "6", "s"); // 96s, 97s
-addLeftFixedPlus(BTN, "8", "6", "s"); // 86s, 87s
-addLeftFixedPlus(BTN, "7", "5", "s"); // 75s, 76s
-addLeftFixedPlus(BTN, "6", "4", "s"); // 64s, 65s
-for (let i=ORDER.indexOf("4"); i>=1; i--){ const r=ORDER[i]; BTN["A"+r+"o"]=100; } // A4o+
+addLeftFixedPlus(BTN, "9", "6", "s");
+addLeftFixedPlus(BTN, "8", "6", "s");
+addLeftFixedPlus(BTN, "7", "5", "s");
+addLeftFixedPlus(BTN, "6", "4", "s");
+for (let i=ORDER.indexOf("4"); i>=1; i--){ const r=ORDER[i]; BTN["A"+r+"o"]=100; }
 for (const r of ["9","T","J","Q","K"]){ BTN["K"+r+"o"]=100; }
 for (const r of ["9","T","J","Q","K"]){ BTN["Q"+r+"o"]=100; }
 for (const r of ["8","9","T","J","Q","K"]){ BTN["J"+r+"o"]=100; }
 for (const r of ["8","9","T","J","Q","K"]){ BTN["T"+r+"o"]=100; }
 BTN["98o"]=100;
 for (const h of ["A3o","A2o","K8s","Q2s","J4s","85s","63s","53s","43s"]) BTN[h]=75;
-// Corrections
 for (const h of ["JTs","J9s","J8s","J7s","J6s","T9s","T8s","T7s","K8s","98s","54s"]) BTN[h]=100;
 
-
-/* ===== SB data (3bb Open) ===== */
-setPairsAtLeast(SB,"2"); // 22+
-
-// Suited 100%: A2s+, K2s+, Q2s+, J5s+, T5s+, 96s+, 85s+, 74s+, 64s+, 54s+
+setPairsAtLeast(SB,"2");
 addSuitedPlus2(SB,"A","2");
 addSuitedPlus2(SB,"K","2");
 addSuitedPlus2(SB,"Q","2");
@@ -367,8 +361,6 @@ addRunLeftFixedPlus(SB,"8","5");
 addRunLeftFixedPlus(SB,"7","4");
 addRunLeftFixedPlus(SB,"6","4");
 addRunLeftFixedPlus(SB,"5","4");
-
-// Offsuit 100%: A4o+, K7o+, Q9o+, J9o+, T8o+, 98o, 87o
 addOffsuitPlus(SB,"A","4");
 addOffsuitPlus(SB,"K","7");
 addOffsuitPlus(SB,"Q","9");
@@ -376,19 +368,13 @@ addOffsuitPlus(SB,"J","9");
 addOffsuitPlus(SB,"T","8");
 SB["98o"]=100;
 SB["87o"]=100;
-
-// Suited 75%: J4s, J3s, J2s, T4s, 95s, 63s, 53s, 43s
 for (const h of ["J4s","J3s","J2s","T4s","95s","63s","53s","43s"]) SB[h]=75;
-
-// Offsuit 75%: 97o, J8o, Q8o, K6o, A3o
 for (const h of ["97o","J8o","Q8o","K6o","A3o"]) SB[h]=75;
 
-/* ===== data helpers ===== */
 function getMap(pos){ return pos==="UTG"?UTG:pos==="HJ"?HJ:pos==="CO"?CO:pos==="BTN"?BTN:SB; }
 function toData(map,pos){ return Object.entries(map).map(([Hand,Frequency])=>({Position:pos, Hand, Frequency})); }
 const DATA = { UTG: toData(UTG,"UTG"), HJ: toData(HJ,"HJ"), CO: toData(CO,"CO"), BTN: toData(BTN,"BTN"), SB: toData(SB,"SB") };
 
-/* ===== boundary & neighbors for quiz ===== */
 function boundarySetOf(map){ return new Set(Object.entries(map).filter(([,f])=>f===50||f===75).map(([h])=>h)); }
 const BOUNDARY = { UTG: boundarySetOf(UTG), HJ: boundarySetOf(HJ), CO: boundarySetOf(CO), BTN: boundarySetOf(BTN), SB: boundarySetOf(SB) };
 function fromHandOrder(hand){
@@ -415,7 +401,6 @@ function neighborsOf(handSet){
 }
 const NEAR = { UTG: neighborsOf(BOUNDARY.UTG), HJ: neighborsOf(BOUNDARY.HJ), CO: neighborsOf(BOUNDARY.CO), BTN: neighborsOf(BOUNDARY.BTN), SB: neighborsOf(BOUNDARY.SB) };
 
-/* ===== weighted sampler ===== */
 function bucketsFor(pos){
   const DATASET = DATA[pos];
   const BOUND = BOUNDARY[pos];
@@ -441,9 +426,8 @@ function pickOne(pos){
   return weighted[Math.floor(Math.random()*weighted.length)];
 }
 
-/* ===== seat-based position picker ===== */
 const POS_IDS = ["UTG","HJ","CO","BTN","SB"];
-const selectedPositions = new Set(POS_IDS); // default: all selected
+const selectedPositions = new Set(POS_IDS);
 for (const id of POS_IDS){
   const el = document.getElementById("seat"+id);
   el.addEventListener("click", ()=>{
@@ -474,7 +458,6 @@ function setActiveSeat(pos){
 function updateStartButton(){ document.getElementById("startBtn").disabled = selectedPositions.size===0; }
 updateStartButton(); refreshPickVisuals();
 
-/* ===== Cards rendering ===== */
 const SUIT_SYMBOL = {S:"♠", H:"♥", D:"♦", C:"♣"};
 function suitColorClass(s){ return (s==="H"||s==="D") ? "red" : "black"; }
 function handToCards(hand){
@@ -496,7 +479,6 @@ function makeCardElement(code){
   return el;
 }
 
-/* ===== deal overlay positioning near seats ===== */
 const overlay = document.getElementById("dealOverlay");
 const onTableCards = document.getElementById("hand-cards");
 function placeCardsNear(pos){
@@ -515,17 +497,6 @@ function placeCardsNear(pos){
 }
 function hideCardsOnTable(){ overlay.classList.add("hidden"); onTableCards.innerHTML=""; }
 
-/* ===== UI interactions ===== */
-document.getElementById("openViewerBtn").addEventListener("click", ()=>{ hideCardsOnTable(); show(document.getElementById("viewerPanel")); renderGrid("UTG"); });
-document.getElementById("closeViewerBtn").addEventListener("click", ()=>{ hide(document.getElementById("viewerPanel")); });
-document.querySelectorAll(".posTab").forEach(btn=>{
-  btn.addEventListener("click", ()=>{
-    document.querySelectorAll(".posTab").forEach(b=>b.classList.remove("active"));
-    btn.classList.add("active"); renderGrid(btn.dataset.pos);
-  });
-});
-
-/* ===== Quiz controls ===== */
 const CHOICES = [0,25,50,75,100];
 const QUIZ_LEN = 10;
 let quizPool=[], usedSet=new Set();
@@ -535,17 +506,18 @@ let basePoints=0, bonusPoints=0;
 function totalScore(){ return basePoints + bonusPoints; }
 (function renderButtons(){ const cont=document.getElementById("buttons"); cont.innerHTML = CHOICES.map(c=>`<button data-choice="${c}">${c}%</button>`).join(""); })();
 
+document.getElementById("openViewerBtn").addEventListener("click", ()=>{ hideCardsOnTable(); show(document.getElementById("viewerPanel")); renderGrid("UTG"); updateLegendBoxSize(); });
+document.getElementById("closeViewerBtn").addEventListener("click", ()=>{ hide(document.getElementById("viewerPanel")); });
+
 document.getElementById("startBtn").addEventListener("click", ()=>{
   hide(document.getElementById("viewerPanel"));
   document.getElementById("startPanel").classList.add("hidden");
   document.getElementById("quizPanel").classList.remove("hidden");
   clearPickVisuals();
-  // reset round state
   questionIndex = 0; basePoints = 0; bonusPoints = 0; history = []; inReview = false;
   quizPool = []; usedSet = new Set();
   document.getElementById("score").textContent="0"; document.getElementById("progress").textContent="0";
   document.getElementById("result").textContent="";
-  // build pool upfront
   buildQuizPool();
   if (!quizPool || quizPool.length===0){
     const posList = Array.from(selectedPositions);
@@ -557,10 +529,10 @@ document.getElementById("startBtn").addEventListener("click", ()=>{
       if (quizPool.length>=QUIZ_LEN) break;
     }
   }
-  // last resort
   if (!quizPool || quizPool.length===0){ quizPool=[{Position:"UTG", Hand:"AA", Frequency:100}]; }
   newQuestion();
 });
+
 document.getElementById("buttons").addEventListener("click",(e)=>{
   const btn = e.target.closest("button[data-choice]"); if(!btn) return;
   const choice = parseInt(btn.dataset.choice,10);
@@ -576,7 +548,6 @@ function quitToStart(){
   hide(document.getElementById("summaryPanel"));
   show(document.getElementById("startPanel"));
   hideCardsOnTable();
-  // reset
   quizPool=[]; usedSet=new Set(); questionIndex=0; current=null; history=[];
   inReview=false; reviewQueue=[]; reviewIndex=0; nextRoundQueue=[];
   basePoints=0; bonusPoints=0;
@@ -587,7 +558,6 @@ function quitToStart(){
   updateStartButton();
 }
 
-/* quiz flow */
 function newQuestion(){
   if (questionIndex >= QUIZ_LEN){ return endQuiz(); }
   if (questionIndex === 0 && (!quizPool || quizPool.length===0)) buildQuizPool();
@@ -606,13 +576,12 @@ function newQuestion(){
   document.getElementById("nextBtn").classList.add("hidden");
   startTime = performance.now();
 }
-function nearestBucket(freq){ return CHOICES.reduce((p,c)=> Math.abs(c-freq) < Math.abs(p-freq) ? c : p, CHOICES[0]); }
+function nearestBucket(freq){ const CH=[0,25,50,75,100]; return CH.reduce((p,c)=> Math.abs(c-freq) < Math.abs(p-freq) ? c : p, CH[0]); }
 function updateProgress(){ document.getElementById("progress").textContent = String(questionIndex); }
 function handleAnswer(choice){
   const nearest = nearestBucket(current.Frequency);
   const correct = (choice === nearest);
   const elapsedSec = (performance.now() - startTime)/1000;
-  const cat = (current.Frequency===0) ? "フォールド" : (current.Frequency===100 ? "純オープン" : "境界");
   if (correct){
     const bonus = elapsedSec <= 3 ? 3 : (elapsedSec <= 5 ? 1 : 0);
     basePoints += 1; bonusPoints += bonus;
@@ -654,8 +623,6 @@ function buildQuizPool(){
   }
 }
 
-/* end & review */
-
 function endQuiz(){
   const quiz = document.getElementById("quizPanel");
   const summary = document.getElementById("summaryPanel");
@@ -689,7 +656,7 @@ function endQuiz(){
     summary.scrollIntoView({behavior:'auto', block:'start'});
   } catch {}
 }
-/* review */
+
 let reviewQueue = [], reviewIndex = 0, nextRoundQueue = [];
 function startReview(){
   if (!reviewQueue.length) return;
@@ -736,7 +703,6 @@ function handleReviewAnswer(choice){
 }
 function onNextFromWrong_Review(){ reviewIndex++; nextReviewQuestion(); }
 
-/* ===== Range Viewer render ===== */
 const rangeGrid = document.getElementById("rangeGrid");
 function renderGrid(pos){
   const map = getMap(pos);
@@ -753,6 +719,15 @@ function renderGrid(pos){
     }
   }
 }
+document.querySelectorAll(".posTab").forEach(btn=>{
+  btn.addEventListener("click", ()=>{
+    document.querySelectorAll(".posTab").forEach(b=>b.classList.remove("active"));
+    btn.classList.add("active"); renderGrid(btn.dataset.pos);
+  });
+});
+document.getElementById("openViewerBtn").addEventListener("click", ()=>{ hideCardsOnTable(); show(document.getElementById("viewerPanel")); renderGrid("UTG"); updateLegendBoxSize(); });
+document.getElementById("closeViewerBtn").addEventListener("click", ()=>{ hide(document.getElementById("viewerPanel")); });
+
 </script>
 </body>
 </html>
